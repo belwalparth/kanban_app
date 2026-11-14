@@ -54,62 +54,71 @@ export function KanbanBoard() {
         <div>
           <p className="eyebrow">Project board</p>
           <h1>Kanban workflow</h1>
+          <p className="board-subtitle">A clear view of what’s moving and what’s next.</p>
         </div>
-        <div className="board-stat">
+        <div className="board-stat" aria-label={`${totalCards} cards on this board`}>
           <span>{totalCards}</span>
           <small>cards</small>
         </div>
       </header>
 
-      <div className="board-grid">
-        {columns.map((column) => (
-          <section
-            key={column.id}
-            className="column"
-            onDragOver={(event) => event.preventDefault()}
-            onDrop={() => handleDrop(column.id)}
-          >
-            <div className="column-header">
-              <input
-                aria-label={`Rename ${column.title}`}
-                value={column.title}
-                onChange={(event) => handleRenameColumn(column.id, event.target.value)}
-              />
-              <button type="button" className="secondary-button" onClick={() => handleAddCard(column.id)}>
-                Add card
-              </button>
-            </div>
+      <div className="board-scroll" aria-label="Kanban columns" tabIndex={0}>
+        <div className="board-grid">
+          {columns.map((column) => (
+            <section
+              key={column.id}
+              className={`column${draggedCard ? " column-drop-ready" : ""}`}
+              aria-label={`${column.title} column`}
+              onDragOver={(event) => event.preventDefault()}
+              onDrop={() => handleDrop(column.id)}
+            >
+              <div className="column-header">
+                <div className="column-title-group">
+                  <input
+                    aria-label={`Rename ${column.title}`}
+                    value={column.title}
+                    onChange={(event) => handleRenameColumn(column.id, event.target.value)}
+                  />
+                  <span className="card-count" aria-label={`${column.cards.length} cards`}>
+                    {column.cards.length}
+                  </span>
+                </div>
+                <button type="button" className="secondary-button" onClick={() => handleAddCard(column.id)}>
+                  <span aria-hidden="true">+</span> Add card
+                </button>
+              </div>
 
-            <div className="card-list">
-              {column.cards.length === 0 ? (
-                <div className="empty-state">Drop a card here</div>
-              ) : (
-                column.cards.map((card) => (
-                  <div
-                    key={card.id}
-                    className="card"
-                    draggable
-                    onDragStart={(event) => handleDragStart(event, card.id, column.id)}
-                    onDragEnd={() => setDraggedCard(null)}
-                  >
-                    <div className="card-header-row">
-                      <h3>{card.title}</h3>
-                      <button
-                        type="button"
-                        className="icon-button"
-                        aria-label={`Delete ${card.title}`}
-                        onClick={() => handleDeleteCard(column.id, card.id)}
-                      >
-                        ×
-                      </button>
+              <div className="card-list">
+                {column.cards.length === 0 ? (
+                  <div className="empty-state">Drop a card here</div>
+                ) : (
+                  column.cards.map((card) => (
+                    <div
+                      key={card.id}
+                      className={`card${draggedCard?.cardId === card.id ? " card-dragging" : ""}`}
+                      draggable
+                      onDragStart={(event) => handleDragStart(event, card.id, column.id)}
+                      onDragEnd={() => setDraggedCard(null)}
+                    >
+                      <div className="card-header-row">
+                        <h3>{card.title}</h3>
+                        <button
+                          type="button"
+                          className="icon-button"
+                          aria-label={`Delete ${card.title}`}
+                          onClick={() => handleDeleteCard(column.id, card.id)}
+                        >
+                          ×
+                        </button>
+                      </div>
+                      <p>{card.details}</p>
                     </div>
-                    <p>{card.details}</p>
-                  </div>
-                ))
-              )}
-            </div>
-          </section>
-        ))}
+                  ))
+                )}
+              </div>
+            </section>
+          ))}
+        </div>
       </div>
     </div>
   );
