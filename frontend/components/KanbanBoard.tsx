@@ -51,11 +51,12 @@ export function KanbanBoard() {
   return (
     <div className="board-shell">
       <header className="board-header">
-        <div>
+        <div className="board-header-copy">
           <p className="eyebrow">Project board</p>
           <h1>Kanban workflow</h1>
-          <p className="board-subtitle">A clear view of what’s moving and what’s next.</p>
+          <p className="board-subtitle">A focused view of priorities, progress, and next actions.</p>
         </div>
+
         <div className="board-stat" aria-label={`${totalCards} cards on this board`}>
           <span>{totalCards}</span>
           <small>cards</small>
@@ -83,8 +84,10 @@ export function KanbanBoard() {
                     {column.cards.length}
                   </span>
                 </div>
+
                 <button type="button" className="secondary-button" onClick={() => handleAddCard(column.id)}>
-                  <span aria-hidden="true">+</span> Add card
+                  <span aria-hidden="true">＋</span>
+                  Add card
                 </button>
               </div>
 
