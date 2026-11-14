@@ -10,49 +10,57 @@ export type Column = {
   cards: Card[];
 };
 
-const makeId = (prefix: string) => `${prefix}-${Math.random().toString(36).slice(2, 9)}`;
+const makePersistedId = (prefix: string, seed: number) => `${prefix}-${seed}`;
+
+const makeRuntimeId = (prefix: string) => {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return `${prefix}-${crypto.randomUUID()}`;
+  }
+
+  return `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+};
 
 export const DEFAULT_COLUMNS: Column[] = [
   {
     id: "backlog",
     title: "Backlog",
     cards: [
-      { id: makeId("card"), title: "Draft onboarding", details: "Outline the first-run experience for new users." },
-      { id: makeId("card"), title: "Research analytics", details: "Review the event map and reporting needs." },
+      { id: makePersistedId("card", 1), title: "Draft onboarding", details: "Outline the first-run experience for new users." },
+      { id: makePersistedId("card", 2), title: "Research analytics", details: "Review the event map and reporting needs." },
     ],
   },
   {
     id: "todo",
     title: "To do",
     cards: [
-      { id: makeId("card"), title: "Design sprint plan", details: "Align the product and engineering priorities." },
+      { id: makePersistedId("card", 3), title: "Design sprint plan", details: "Align the product and engineering priorities." },
     ],
   },
   {
     id: "in-progress",
     title: "In progress",
     cards: [
-      { id: makeId("card"), title: "Prototype dashboard", details: "Validate card interactions and spacing." },
+      { id: makePersistedId("card", 4), title: "Prototype dashboard", details: "Validate card interactions and spacing." },
     ],
   },
   {
     id: "review",
     title: "Review",
     cards: [
-      { id: makeId("card"), title: "QA checklist", details: "Confirm the no-persistence and fixed-board constraints." },
+      { id: makePersistedId("card", 5), title: "QA checklist", details: "Confirm the no-persistence and fixed-board constraints." },
     ],
   },
   {
     id: "done",
     title: "Done",
     cards: [
-      { id: makeId("card"), title: "Kickoff brief", details: "Locked in scope and success criteria." },
+      { id: makePersistedId("card", 6), title: "Kickoff brief", details: "Locked in scope and success criteria." },
     ],
   },
 ];
 
 export const createCard = (title = "New card", details = "Add some details here.") => ({
-  id: makeId("card"),
+  id: makeRuntimeId("card"),
   title,
   details,
 });
