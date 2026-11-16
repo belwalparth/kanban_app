@@ -3,14 +3,18 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { getSession, signIn, signOut } from "@/lib/auth";
 import { AuthGate } from "./AuthGate";
+import { resetBoardServer } from "@/test/board-server";
+import { BoardApiError, saveBoard } from "@/lib/board-api";
 
 vi.mock("@/lib/auth", () => ({ getSession: vi.fn(), signIn: vi.fn(), signOut: vi.fn() }));
+vi.mock("@/lib/board-api", async (original) => ({ ...await original<typeof import("@/lib/board-api")>(), loadBoard: vi.fn(), saveBoard: vi.fn() }));
 
 beforeEach(() => {
   vi.resetAllMocks();
   vi.mocked(getSession).mockResolvedValue(null);
   vi.mocked(signIn).mockResolvedValue({ username: "user" });
   vi.mocked(signOut).mockResolvedValue(undefined);
+  resetBoardServer();
 });
 
 async function enterCredentials(username = "user", password = "password") {
@@ -67,19 +71,21 @@ describe("Authentication gate", () => {
     expect(screen.getByLabelText("Password")).toBeDisabled();
   });
 
-  it("unmounts private board state on logout and starts fresh on sign-in", async () => {
+  it("unmounts private UI on logout and loads saved edits on sign-in", async () => {
     vi.mocked(getSession).mockResolvedValue({ username: "user" });
     const user = userEvent.setup();
     render(<AuthGate />);
     const column = await screen.findByRole("textbox", { name: "Rename Review" });
     await user.clear(column);
     await user.type(column, "Private draft");
+    await user.keyboard("{Enter}");
+    await screen.findByRole("region", { name: "Private draft column" });
     await user.click(screen.getByRole("button", { name: "Sign out" }));
     expect(signOut).toHaveBeenCalledOnce();
     expect(await screen.findByRole("heading", { name: "Welcome back" })).toBeInTheDocument();
     expect(screen.queryByRole("article")).not.toBeInTheDocument();
     await enterCredentials();
-    expect(await screen.findByRole("textbox", { name: "Rename Review" })).toHaveValue("Review");
+    expect(await screen.findByRole("textbox", { name: "Rename Private draft" })).toHaveValue("Private draft");
   });
 
   it("keeps the board visible with an error if logout fails", async () => {
@@ -87,6 +93,7 @@ describe("Authentication gate", () => {
     vi.mocked(signOut).mockRejectedValue(new Error("Network unavailable"));
     const user = userEvent.setup();
     render(<AuthGate />);
+    await screen.findByRole("heading", { name: "Project board." });
     await user.click(await screen.findByRole("button", { name: "Sign out" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("Couldn't sign out.");
     expect(screen.getAllByRole("article")).toHaveLength(6);
@@ -119,7 +126,7 @@ describe("Authentication gate", () => {
     await user.clear(column);
     await user.type(column, "Still editing");
     fireEvent.focus(window);
-    expect(await screen.findByRole("textbox", { name: "Rename Still editing" })).toHaveValue("Still editing");
+    expect(await screen.findByRole("textbox", { name: "Rename Review" })).toHaveValue("Still editing");
   });
 
   it("does not let an older session check restore the board after logout", async () => {
@@ -133,6 +140,15 @@ describe("Authentication gate", () => {
     await screen.findByRole("heading", { name: "Welcome back" });
     await act(async () => { finishCheck({ username: "user" }); });
     expect(screen.getByRole("heading", { name: "Welcome back" })).toBeInTheDocument();
+    expect(screen.queryByRole("article")).not.toBeInTheDocument();
+  });
+
+  it("returns to login and removes the board when a save returns 401", async () => {
+    vi.mocked(getSession).mockResolvedValue({ username: "user" });
+    vi.mocked(saveBoard).mockRejectedValueOnce(new BoardApiError(401));
+    render(<AuthGate />);
+    await userEvent.setup().click(await screen.findByRole("button", { name: "Delete Draft onboarding" }));
+    expect(await screen.findByRole("heading", { name: "Welcome back" })).toBeInTheDocument();
     expect(screen.queryByRole("article")).not.toBeInTheDocument();
   });
 });

@@ -47,8 +47,8 @@ def test_static_files_cannot_escape_root(client, tmp_path):
 
 
 @pytest.mark.skipif(not (STATIC_DIR / "index.html").exists(), reason="Production export is tested in Docker")
-def test_real_production_export_and_assets():
-    with TestClient(create_app()) as client:
+def test_real_production_export_and_assets(tmp_path):
+    with TestClient(create_app(database_path=tmp_path / "export-test.db")) as client:
         response = client.get("/")
         assert response.status_code == 200
         assert "Checking your session" in response.text

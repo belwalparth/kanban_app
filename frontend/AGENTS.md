@@ -1,6 +1,6 @@
 # Frontend instructions
 
-Read the root `Agents.md` and `docs/Plan.md` before changes. Follow the approved part of the plan. This describes the Part 4 frontend; update it as implementation changes.
+Read the root `Agents.md` and `docs/Plan.md` before changes. Follow the approved part of the plan. This describes the Part 7 frontend; update it as implementation changes.
 
 ## Existing code
 
@@ -10,14 +10,20 @@ Read the root `Agents.md` and `docs/Plan.md` before changes. Follow the approved
 - `components/AuthGate.tsx`: checks the server session on load/window focus, gates board rendering, and handles logout/retry. A version ref prevents older session responses from undoing login/logout. Unmounting the board clears its local state.
 - `components/SignIn.tsx`: labeled username/password form with pending/error states and demo credential guidance. The backend validates credentials.
 - `lib/auth.ts`: same-origin login/session/logout fetch calls; session cookies are HttpOnly and never stored in browser storage.
+- `lib/board-api.ts`: authenticated board reads/replacements using the backend revision envelope and typed HTTP status errors.
+- `lib/use-board.ts`: single canonical board/revision state owned by the board component, available for future sidebar integration. Loads server data, serializes saves with an immediate in-flight guard, applies server responses, reloads conflicts, and reports session expiry. Do not introduce a second independent board state for chat.
 - `app/globals.css`: palette, system fonts without external requests, board/card/dialog styles, responsive horizontal scrolling, focus styling, and reduced-motion rules.
 - `components/KanbanBoard.tsx`: client component with board/drag/editor state, card CRUD, column rename, completion progress, live announcements, empty states, native HTML cross-column drag/drop, and signed-in username/logout controls.
-- `components/CardEditor.tsx`: native modal dialog with labeled title/details fields, a column selector for keyboard/touch movement, save/create, cancel, and Escape dismissal.
+- `components/CardEditor.tsx`: native modal dialog with title/details/column fields, async save feedback, and retained drafts on failure. Pending saves disable inputs and dismissal. Conflicts close the obsolete draft after attempting a canonical reload.
+- `components/ColumnTitle.tsx`: local rename draft; Enter/blur commits, Escape cancels. Blank names restore the saved title; failed saves retain the draft with an error. Reload generation keys discard obsolete rename drafts after conflicts.
 - `lib/board.ts`: `Card`/`Column` types, seeded data, ID generation, and immutable add/edit/delete/rename/move helpers.
 - `lib/board.test.ts` and `components/KanbanBoard.test.tsx`: helper and user interaction tests.
 - `vitest.config.ts` / `vitest.setup.ts`: jsdom, Testing Library, alias resolution, current Vite Oxc JSX transform, and a dialog lifecycle shim for jsdom. Browser focus behavior is covered by Playwright.
 - `components/AuthGate.test.tsx`: login, session restoration, pending/errors, logout cleanup, focus checks, and stale response regression coverage.
-- `e2e/auth.spec.ts`, `e2e/board.spec.ts`, and `playwright.config.ts`: desktop/mobile Chromium tests against Docker, including login/logout and actual desktop drag/drop. Board tests authenticate through the API; auth tests use the real form. `PLAYWRIGHT_BASE_URL` overrides `http://localhost:8000`; `PLAYWRIGHT_CHANNEL=chrome` uses installed Chrome.
+- `test/board-server.ts`: isolated mocked API state for component tests. Test data does not initialize the production board.
+- `e2e/fixtures.ts`: per-test mocked board responses for normal desktop/mobile checks; authentication uses the running backend. `e2e/board-errors.spec.ts` covers save failures, conflicts, retry, and expiry.
+- `e2e/persistence.spec.ts`: a desktop check against the real board API. Uses a unique temporary card and cleans up only that card. Never reset the user's board to test defaults. Mobile skips this duplicate real-data check and native drag/drop; touch movement is tested through the editor.
+- `playwright.config.ts`: `PLAYWRIGHT_BASE_URL` overrides `http://localhost:8000`; `PLAYWRIGHT_CHANNEL=chrome` uses installed Chrome.
 - `next.config.mjs`: static export in production, strict mode, and development-only `/api/*` proxy to FastAPI on port 8000. Docker copies `out/` to FastAPI's static directory; no production Node server.
 - `eslint.config.mjs`: flat configuration with Next.js core-web-vitals and TypeScript rules.
 - `tsconfig.json`: TypeScript configuration and `@/` import alias.
@@ -26,7 +32,9 @@ Read the root `Agents.md` and `docs/Plan.md` before changes. Follow the approved
 
 Five fixed column IDs: `backlog`, `todo`, `in-progress`, `review`, `done`. Display titles are editable. Cards have `id`, `title`, and `details`. Moves append to the destination; same-column drops do nothing.
 
-Sign-in uses `user` / `password` with a backend-signed session cookie. Reload restores authentication while the cookie is valid. Logout clears the cookie and unmounts private UI state. Board data still lives in component state and resets on reload/logout. Persistent board APIs and chat are absent. Do not describe planned features as implemented. Card creation/editing uses a modal; cancelling leaves the board unchanged and blank titles cannot be saved.
+Sign-in uses `user` / `password` with a backend-signed cookie. Board data loads from SQLite through `/api/board` and persists across reload/logout/restart. Logout/expired sessions unmount private UI; signing in loads the saved board. Chat is not implemented.
+
+All supported operations save through the same board/revision state. Do not show optimistic data as committed: apply the canonical API response on success. Retain failed card/rename drafts and leave failed deletes/moves unchanged. On 409, load the current server board without replaying the edit; if loading fails, block edits until reload succeeds. A 401 returns the app to sign-in. `DEFAULT_COLUMNS` is a test reference, not a production loading fallback.
 
 ## Commands
 
@@ -40,7 +48,7 @@ Run from `frontend/`:
 - `npm run lint`: ESLint CLI; Next.js no longer runs lint as part of its build.
 - `npm run test:e2e`: Playwright tests; requires a running app and installed Chromium/Chrome.
 
-Validation results and limitations are recorded in `docs/PART3_VALIDATION.md` and `docs/PART4_VALIDATION.md`.
+Current validation and manual checks are in `docs/PART7_VALIDATION.md`; prior parts document earlier milestones.
 
 ## Change conventions
 

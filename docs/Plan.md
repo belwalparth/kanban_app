@@ -85,54 +85,60 @@ Tests:
 
 Success: only the MVP credentials grant access, session restoration works, and logout returns the UI to login.
 
-Completed 2026-11-16. See `docs/PART4_VALIDATION.md` for test results and manual checks. Part 5 has not started.
+Completed 2026-11-16. See `docs/PART4_VALIDATION.md` for test results and manual checks. User subsequently approved Part 5.
 
 ## Part 5: Database modeling and approval
 
-- [ ] Write `docs/DATABASE.md` proposing users and boards tables, primary/foreign keys, ownership, and one-board-per-user uniqueness.
-- [ ] Define board JSON preserving stable column/card IDs, titles/details, column order, and card order. Keep ownership outside client-controlled JSON.
-- [ ] Define validation: fixed column IDs, unique card IDs, valid text fields, and valid move destinations.
-- [ ] Document first-run user/board seeding and SQLite path within the mounted volume.
-- [ ] Propose transactional updates and a simple board revision check to prevent stale manual/AI writes.
-- [ ] Include example JSON and explain initialization, persistence, and deletion behavior.
-- [ ] Obtain user approval before Part 6. These schema details remain proposals until approved.
+- [x] Write `docs/DATABASE.md` proposing users and boards tables, primary/foreign keys, ownership, and one-board-per-user uniqueness.
+- [x] Define board JSON preserving stable column/card IDs, titles/details, column order, and card order. Keep ownership outside client-controlled JSON.
+- [x] Define validation: fixed column IDs, unique card IDs, valid text fields, and valid move destinations.
+- [x] Document first-run user/board seeding and SQLite path within the mounted volume.
+- [x] Propose transactional updates and a simple board revision check to prevent stale manual/AI writes.
+- [x] Include example JSON and explain initialization, persistence, and deletion behavior.
+- [x] Obtain user approval before Part 6. These schema details remain proposals until approved.
 
 Validation: walk through every card operation, column rename, a second hypothetical user, stale writes, and container restart against the design.
 
 Success: the approved design stores board JSON in SQLite, supports future user ownership, and avoids unnecessary card/column tables.
 
+Proposal prepared in `docs/DATABASE.md`, with the full seed example in `docs/board.example.json`. Reviewed against existing code and the documented scenarios. User approved proceeding to Part 6 on 2026-11-16. Part 5 changed documentation only.
+
 ## Part 6: Persistent backend API
 
-- [ ] Implement the approved schema and idempotent initialization/seeding when the database does not exist.
-- [ ] Resolve database user ownership from authenticated identity, never a client-supplied user ID.
-- [ ] Add authenticated board read/update endpoints using validated whole-board JSON updates to keep the API small.
-- [ ] Enforce column/card invariants, ownership, transactions, and revision conflict checks.
-- [ ] Return consistent validation/authentication/conflict errors without partial writes.
+- [x] Implement the approved schema and idempotent initialization/seeding when the database does not exist.
+- [x] Resolve database user ownership from authenticated identity, never a client-supplied user ID.
+- [x] Add authenticated board read/update endpoints using validated whole-board JSON updates to keep the API small.
+- [x] Enforce column/card invariants, ownership, transactions, and revision conflict checks.
+- [x] Return consistent validation/authentication/conflict errors without partial writes.
 
 Tests:
 
-- [ ] Use temporary SQLite databases for fresh/repeated startup, seeding, round trips, and rejected-write rollback.
-- [ ] Persist every supported card operation and column rename through API tests.
-- [ ] Test invalid structures, changed fixed columns, duplicate IDs, missing authentication, and stale revisions.
-- [ ] Seed a second test user and verify read/write isolation.
+- [x] Use temporary SQLite databases for fresh/repeated startup, seeding, round trips, and rejected-write rollback.
+- [x] Persist every supported card operation and column rename through API tests.
+- [x] Test invalid structures, changed fixed columns, duplicate IDs, missing authentication, and stale revisions.
+- [x] Seed a second test user and verify read/write isolation.
 
 Success: valid updates survive reopening SQLite; rejected requests preserve stored data and cannot affect another user's board.
 
+Completed 2026-11-16. See `docs/PART6_VALIDATION.md`: 73 backend tests, 10 browser auth regression checks, and live API persistence through container stop/start passed. User subsequently approved Part 7.
+
 ## Part 7: Frontend and persistent backend
 
-- [ ] Replace demo initialization with authenticated API loading and canonical server board/revision state.
-- [ ] Persist create/edit/delete/move and column renames; commit renames rather than saving every keystroke.
-- [ ] Keep shared board state for later chat integration and serialize or disable overlapping saves.
-- [ ] Show loading/save errors, retain recoverable failed edits, and reload server state on revision conflicts.
-- [ ] Return to login and clear private board/chat state when authentication expires.
+- [x] Replace demo initialization with authenticated API loading and canonical server board/revision state.
+- [x] Persist create/edit/delete/move and column renames; commit renames rather than saving every keystroke.
+- [x] Keep shared board state for later chat integration and serialize or disable overlapping saves.
+- [x] Show loading/save errors, retain recoverable failed edits, and reload server state on revision conflicts.
+- [x] Return to login and clear private board/chat state when authentication expires.
 
 Tests:
 
-- [ ] Component/API tests cover load/save, failed saves, conflicts, and expired sessions.
-- [ ] Browser tests perform all board operations and reload to verify persistence.
-- [ ] Restart the container and log out/in; verify saved data remains.
+- [x] Component/API tests cover load/save, failed saves, conflicts, and expired sessions.
+- [x] Browser tests perform all board operations and reload to verify persistence.
+- [x] Restart the container and log out/in; verify saved data remains.
 
 Success: all board interactions persist through FastAPI/SQLite, and failed saves are not presented as successful.
+
+Completed 2026-11-16. See `docs/PART7_VALIDATION.md`: 41 frontend tests, 73 backend tests, 30 browser checks (2 intentional skips), and browser-created card persistence through full container stop/start passed. Part 8 has not started.
 
 ## Part 8: OpenRouter connectivity
 

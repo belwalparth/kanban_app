@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 
 async function signIn(page: import("@playwright/test").Page) {
   await page.getByLabel("Username", { exact: true }).fill("user");
@@ -27,10 +27,12 @@ test("login is required, errors are clear, and the session survives reload", asy
   expect(await page.evaluate(() => document.cookie)).not.toContain("kanban_session");
 });
 
-test("logout removes access, survives reload/back, and clears board edits", async ({ page }) => {
+test("logout clears private UI while saved board edits survive sign-in", async ({ page }) => {
   await page.goto("/");
   await signIn(page);
   await page.getByRole("textbox", { name: "Rename Backlog" }).fill("Private draft");
+  await page.getByRole("textbox", { name: "Rename Backlog" }).press("Enter");
+  await expect(page.getByRole("region", { name: "Private draft column" })).toBeVisible();
   await page.getByRole("button", { name: "Sign out", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Welcome back" })).toBeVisible();
   await expect(page.getByRole("article")).toHaveCount(0);
@@ -41,7 +43,7 @@ test("logout removes access, survives reload/back, and clears board edits", asyn
   await expect(page.getByRole("heading", { name: "Welcome back" })).toBeVisible();
   await page.reload();
   await signIn(page);
-  await expect(page.getByRole("textbox", { name: "Rename Backlog" })).toHaveValue("Backlog");
+  await expect(page.getByRole("textbox", { name: "Rename Private draft" })).toHaveValue("Private draft");
 });
 
 test("a cleared or tampered session cannot restore the board", async ({ page, context }) => {

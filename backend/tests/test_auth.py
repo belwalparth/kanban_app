@@ -9,6 +9,7 @@ from itsdangerous import TimestampSigner
 
 from app.auth import SESSION_COOKIE, SESSION_MAX_AGE, require_user
 from app.main import create_app
+from app.models import User
 
 VALID_CREDENTIALS = {"username": "user", "password": "password"}
 
@@ -97,7 +98,7 @@ def test_secret_controls_session_validity_across_app_instances(client, tmp_path)
     client.post("/api/auth/login", json=VALID_CREDENTIALS)
     cookie = client.cookies.get(SESSION_COOKIE)
     for secret, expected_status in [("test-session-secret", 200), ("different-secret", 401)]:
-        with TestClient(create_app(tmp_path, session_secret=secret)) as other_client:
+        with TestClient(create_app(tmp_path, session_secret=secret, database_path=tmp_path / "test.db")) as other_client:
             other_client.cookies.set(SESSION_COOKIE, cookie)
             assert other_client.get("/api/auth/session").status_code == expected_status
 
@@ -106,8 +107,8 @@ def test_dependency_protects_future_data_routes(client):
     api = next(route.app for route in client.app.routes if route.path == "/api")
 
     @api.get("/private-test")
-    def private_route(username: Annotated[str, Depends(require_user)]):
-        return {"owner": username}
+    def private_route(user: Annotated[User, Depends(require_user)]):
+        return {"owner": user.username}
 
     assert client.get("/api/private-test").status_code == 401
     client.post("/api/auth/login", json=VALID_CREDENTIALS)

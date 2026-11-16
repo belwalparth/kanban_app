@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { KanbanBoard } from "@/components/KanbanBoard";
 import { SignIn } from "@/components/SignIn";
 import { getSession, signOut, type User } from "@/lib/auth";
@@ -12,6 +12,11 @@ export function AuthGate() {
   const [attempt, setAttempt] = useState(0);
   const [signingOut, setSigningOut] = useState(false);
   const sessionVersion = useRef(0);
+  const handleSessionExpired = useCallback(() => {
+    sessionVersion.current += 1;
+    setUser(null);
+    setError("");
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -48,7 +53,7 @@ export function AuthGate() {
   if (checking) return <div className="session-check" role="status">Checking your session...</div>;
   if (user) return <>
     {error && <p className="auth-banner" role="alert">{error}</p>}
-    <KanbanBoard username={user.username} onSignOut={handleSignOut} signingOut={signingOut} />
+    <KanbanBoard username={user.username} onSignOut={handleSignOut} signingOut={signingOut} onSessionExpired={handleSessionExpired} />
   </>;
 
   return <>

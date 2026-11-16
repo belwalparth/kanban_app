@@ -1,6 +1,6 @@
 # Kanban app
 
-A local project management MVP. Sign in with `user` / `password` to create, edit, delete, and move cards or rename columns. FastAPI serves the static Next.js UI and API from one container. Board changes currently reset on refresh or logout.
+A local project management MVP. Sign in with `user` / `password` to create, edit, delete, and move cards or rename columns. FastAPI serves the static Next.js UI and API from one container. Board changes persist in SQLite across refresh, logout, and container restarts.
 
 ## Getting started
 
@@ -18,7 +18,7 @@ sh scripts/start.sh
 sh scripts/stop.sh
 ```
 
-Open http://localhost:8000 after starting. Stop preserves the `kanban-data` volume mounted at `/data`; `DATABASE_PATH` is reserved for `/data/kanban.db` in the later database step.
+Open http://localhost:8000 after starting. Stop preserves the `kanban-data` volume at `/data`, containing `/data/kanban.db`. Column names save on Enter or blur; Escape cancels typing. Wait for the saved status before closing the page. [Manual checks](docs/PART7_VALIDATION.md) include persistence and revision conflicts.
 
 The Windows commands permit the script for that process only; they do not change system execution policy.
 
@@ -38,3 +38,5 @@ With local Python 3.14 and `uv`: `cd backend` then `uv run --locked pytest -q`.
 For frontend development with Node.js 24 or newer, keep Docker running at port 8000, then `cd frontend`, `npm ci`, `npm run dev`; open http://localhost:3000. The development server proxies `/api/*` to FastAPI. `npm run build` exports the site to `frontend/out`.
 
 Browser tests require the app running at port 8000. From `frontend/`, run `npx playwright install chromium` once, then `npm run test:e2e`. To use an installed Google Chrome instead, set `$env:PLAYWRIGHT_CHANNEL = 'chrome'` in PowerShell before running the tests.
+
+Most browser checks mock board responses for isolation. The real persistence check creates and cleans up only its own temporary card; it does not reset your board.

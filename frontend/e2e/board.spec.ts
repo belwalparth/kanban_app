@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 
 test.beforeEach(async ({ page }) => {
   await page.request.post("/api/auth/login", { data: { username: "user", password: "password" } });
@@ -53,13 +53,14 @@ test("cancel and Escape discard edits and restore keyboard focus", async ({ page
   await expect(page.getByRole("article", { name: "Draft onboarding" })).toBeVisible();
 });
 
-test("column rename keeps fixed columns and refresh resets demo edits", async ({ page }) => {
+test("column rename commits once and survives refresh", async ({ page }) => {
   const review = page.getByRole("textbox", { name: "Rename Review" });
   await review.fill("Final review");
+  await review.press("Enter");
   await expect(page.getByRole("region", { name: "Final review column" })).toHaveCount(1);
   await expect(page.getByRole("region", { name: / column$/ })).toHaveCount(5);
   await page.reload();
-  await expect(page.getByRole("textbox", { name: "Rename Review" })).toHaveValue("Review");
+  await expect(page.getByRole("textbox", { name: "Rename Final review" })).toHaveValue("Final review");
 });
 
 test("native drag/drop moves a card and dropping in the same column is a no-op", async ({ page, isMobile }) => {
