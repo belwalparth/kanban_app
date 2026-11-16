@@ -68,22 +68,24 @@ Tests:
 
 Success: the container serves the interactive demo, including editing, with the agreed palette and passing checks. Persistence comes in Part 7.
 
-Completed 2026-11-16. See `docs/PART3_VALIDATION.md` for results, test commands, and a manual checklist. User approved proceeding from Part 2; Part 4 has not started.
+Completed 2026-11-16. See `docs/PART3_VALIDATION.md` for results, test commands, and a manual checklist. User subsequently approved Part 4.
 
 ## Part 4: Dummy sign-in
 
-- [ ] Add backend login/logout/current-session endpoints; check fixed credentials on the server.
-- [ ] Use a simple server-validated session cookie with HttpOnly and SameSite settings suitable for local HTTP; configure signing through server environment settings.
-- [ ] Show login before the board; restore authenticated sessions on reload and clear private UI state on logout.
-- [ ] Protect board/chat APIs as they are introduced. Static UI assets can remain public; user data requires backend authentication.
+- [x] Add backend login/logout/current-session endpoints; check fixed credentials on the server.
+- [x] Use a simple server-validated session cookie with HttpOnly and SameSite settings suitable for local HTTP; configure signing through server environment settings.
+- [x] Show login before the board; restore authenticated sessions on reload and clear private UI state on logout.
+- [x] Provide a reusable authentication dependency for future board/chat APIs. Static UI assets remain public; apply the dependency to user data routes when introduced in Parts 6 and 9.
 
 Tests:
 
-- [ ] Test valid/invalid credentials, missing/tampered session cookies, session lookup, and logout cookie clearing.
-- [ ] Component/browser tests cover errors, successful login, reload, and logout.
-- [ ] Verify logged-out requests cannot read protected data as those routes are added.
+- [x] Test valid/invalid credentials, missing/tampered session cookies, session lookup, and logout cookie clearing.
+- [x] Component/browser tests cover errors, successful login, reload, and logout.
+- [x] Verify session data requires authentication and the reusable dependency protects a test-only data route. Repeat data ownership checks when board/chat APIs are added.
 
 Success: only the MVP credentials grant access, session restoration works, and logout returns the UI to login.
+
+Completed 2026-11-16. See `docs/PART4_VALIDATION.md` for test results and manual checks. Part 5 has not started.
 
 ## Part 5: Database modeling and approval
 

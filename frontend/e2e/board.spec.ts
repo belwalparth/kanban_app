@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 test.beforeEach(async ({ page }) => {
+  await page.request.post("/api/auth/login", { data: { username: "user", password: "password" } });
   await page.goto("/");
 });
 

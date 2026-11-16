@@ -7,7 +7,11 @@ import {
   moveCardBetweenColumns, renameColumnTitle, type Card, type Column,
 } from "@/lib/board";
 
-export function KanbanBoard() {
+export function KanbanBoard({ username, onSignOut, signingOut = false }: {
+  username?: string;
+  onSignOut?: () => void;
+  signingOut?: boolean;
+}) {
   const [columns, setColumns] = useState<Column[]>(DEFAULT_COLUMNS);
   const [draggedCard, setDraggedCard] = useState<{ cardId: string; sourceColumnId: string } | null>(null);
   const [dropTarget, setDropTarget] = useState<string | null>(null);
@@ -50,7 +54,9 @@ export function KanbanBoard() {
     <div className="workspace">
       <header className="workspace-bar">
         <div className="wordmark"><span className="brand-mark" aria-hidden="true"><i /><i /><i /></span>Kanban<span className="wordmark-divider" /> <span className="workspace-name">My workspace</span></div>
-        <span className="workspace-badge"><span aria-hidden="true" />Demo workspace</span>
+        <div className="workspace-actions"><span className="workspace-badge"><span aria-hidden="true" />{username ?? "Demo workspace"}</span>
+          {onSignOut && <button type="button" className="quiet-button" onClick={onSignOut} disabled={signingOut}>{signingOut ? "Signing out..." : "Sign out"}</button>}
+        </div>
       </header>
 
       <div className="board-shell">

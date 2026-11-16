@@ -1,6 +1,6 @@
 # Kanban app
 
-A local project management MVP. FastAPI serves the statically built Next.js Kanban board and `/api/health` from one container. Cards can be created, edited, deleted, and moved; column names are editable. Board changes currently reset on refresh.
+A local project management MVP. Sign in with `user` / `password` to create, edit, delete, and move cards or rename columns. FastAPI serves the static Next.js UI and API from one container. Board changes currently reset on refresh or logout.
 
 ## Getting started
 
@@ -22,7 +22,7 @@ Open http://localhost:8000 after starting. Stop preserves the `kanban-data` volu
 
 The Windows commands permit the script for that process only; they do not change system execution policy.
 
-No environment settings are required yet. Keep the future `OPENROUTER_API_KEY` in root `.env`; it is excluded from images and is not needed or passed to the container yet.
+No settings are required to start. Optionally set a long random `SESSION_SECRET` in root `.env` to keep sessions valid across container restarts; otherwise a new signing key is generated on startup. Sessions use an eight-hour HttpOnly cookie. Keep the future `OPENROUTER_API_KEY` in `.env`; it is excluded from images and not passed to the container yet.
 
 ## Tests
 
@@ -35,6 +35,6 @@ docker run --rm kanban-frontend-test
 
 With local Python 3.14 and `uv`: `cd backend` then `uv run --locked pytest -q`.
 
-For frontend development with Node.js 24 or newer: `cd frontend`, `npm ci`, `npm run dev`; open http://localhost:3000. `npm run build` exports the site to `frontend/out`.
+For frontend development with Node.js 24 or newer, keep Docker running at port 8000, then `cd frontend`, `npm ci`, `npm run dev`; open http://localhost:3000. The development server proxies `/api/*` to FastAPI. `npm run build` exports the site to `frontend/out`.
 
 Browser tests require the app running at port 8000. From `frontend/`, run `npx playwright install chromium` once, then `npm run test:e2e`. To use an installed Google Chrome instead, set `$env:PLAYWRIGHT_CHANNEL = 'chrome'` in PowerShell before running the tests.

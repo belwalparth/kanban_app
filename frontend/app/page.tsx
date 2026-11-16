@@ -1,9 +1,9 @@
-import { KanbanBoard } from "@/components/KanbanBoard";
+import { AuthGate } from "@/components/AuthGate";
 
 export default function Page() {
   return (
     <main className="page-shell">
-      <KanbanBoard />
+      <AuthGate />
     </main>
   );
 }
