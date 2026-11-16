@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Kanban app",
-  description: "Single-board Kanban MVP built in Next.js",
+  title: "Project board | Kanban",
+  description: "A focused workspace to organize your ideas and keep your project moving.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

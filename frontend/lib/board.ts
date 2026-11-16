@@ -47,7 +47,7 @@ export const DEFAULT_COLUMNS: Column[] = [
     id: "review",
     title: "Review",
     cards: [
-      { id: makePersistedId("card", 5), title: "QA checklist", details: "Confirm the no-persistence and fixed-board constraints." },
+      { id: makePersistedId("card", 5), title: "QA checklist", details: "Review the board interactions and final details." },
     ],
   },
   {
@@ -81,6 +81,15 @@ export const deleteCardFromColumn = (columns: Column[], columnId: string, cardId
 
 export const renameColumnTitle = (columns: Column[], columnId: string, title: string) =>
   columns.map((column) => (column.id === columnId ? { ...column, title } : column));
+
+export const editCardInColumn = (
+  columns: Column[],
+  columnId: string,
+  cardId: string,
+  changes: Pick<Card, "title" | "details">,
+) => columns.map((column) => column.id === columnId
+  ? { ...column, cards: column.cards.map((card) => card.id === cardId ? { ...card, ...changes } : card) }
+  : column);
 
 export const moveCardBetweenColumns = (
   columns: Column[],

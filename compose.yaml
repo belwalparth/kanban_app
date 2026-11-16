@@ -1,0 +1,16 @@
+name: kanban-app
+
+services:
+  app:
+    build:
+      context: .
+      target: runtime
+    ports:
+      - "127.0.0.1:8000:8000"
+    environment:
+      SESSION_SECRET: ${SESSION_SECRET:-}
+    volumes:
+      - kanban-data:/data
+
+volumes:
+  kanban-data:
