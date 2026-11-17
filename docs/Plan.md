@@ -138,21 +138,23 @@ Tests:
 
 Success: all board interactions persist through FastAPI/SQLite, and failed saves are not presented as successful.
 
-Completed 2026-11-16. See `docs/PART7_VALIDATION.md`: 41 frontend tests, 73 backend tests, 30 browser checks (2 intentional skips), and browser-created card persistence through full container stop/start passed. Part 8 has not started.
+Completed 2026-11-16. See `docs/PART7_VALIDATION.md`: 41 frontend tests, 73 backend tests, 30 browser checks (2 intentional skips), and browser-created card persistence through full container stop/start passed. User subsequently approved Part 8.
 
 ## Part 8: OpenRouter connectivity
 
-- [ ] Consult official documentation/model metadata for a currently available free chat model with Part 9 structured-output support.
-- [ ] Configure the backend model and runtime API key; document selected model and verification date.
-- [ ] Add a small backend OpenRouter client with timeouts and useful errors, without logging credentials.
-- [ ] Run an explicit live `2+2` check, separately from routine tests.
+- [x] Consult official documentation/model metadata for a currently available free chat model with Part 9 structured-output support.
+- [x] Configure the backend model and runtime API key; document selected model and verification date.
+- [x] Add a small backend OpenRouter client with timeouts and useful errors, without logging credentials.
+- [x] Run an explicit live `2+2` check, separately from routine tests.
 
 Tests:
 
-- [ ] Mock successful responses, missing credentials, timeouts, rate limits, and provider errors.
-- [ ] Verify a real call to the chosen free model answers `4`; record results without secrets.
+- [x] Mock successful responses, missing credentials, timeouts, rate limits, and provider errors.
+- [x] Verify a real call to the chosen free model answers `4`; record results without secrets.
 
 Success: real backend connectivity works with a free model; ordinary tests need neither network nor API key. If no suitable free model is available, document the evidence and resolve the blocker before claiming completion.
+
+Completed 2026-11-17 using `inclusionai/ling-3.2-flash:free`. Live arithmetic returned integer 4 in valid structured JSON. Final backend suite: 104 passed with mocked provider calls. See `docs/PART8_VALIDATION.md`. Part 9 has not started.
 
 ## Part 9: Structured AI board updates
 

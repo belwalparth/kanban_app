@@ -22,7 +22,15 @@ Open http://localhost:8000 after starting. Stop preserves the `kanban-data` volu
 
 The Windows commands permit the script for that process only; they do not change system execution policy.
 
-No settings are required to start. Optionally set a long random `SESSION_SECRET` in root `.env` to keep sessions valid across container restarts; otherwise a new signing key is generated on startup. Sessions use an eight-hour HttpOnly cookie. Keep the future `OPENROUTER_API_KEY` in `.env`; it is excluded from images and not passed to the container yet.
+No settings are required for the board. Optionally set a long random `SESSION_SECRET` in root `.env` to retain sessions across restarts; otherwise startup generates a key. Sessions use an eight-hour HttpOnly cookie. AI connectivity uses `OPENROUTER_API_KEY` from `.env`, passed only to the backend at runtime. Default model: `inclusionai/ling-3.2-flash:free`; optionally override `OPENROUTER_MODEL` with another explicit `:free` model.
+
+To check live AI connectivity after starting (one free-model arithmetic request):
+
+```sh
+docker compose exec -T app python -m app.check_ai
+```
+
+Expect `2+2 = 4; structured response validated.` Chat and AI board updates are later parts.
 
 ## Tests
 

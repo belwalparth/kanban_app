@@ -13,6 +13,7 @@ from starlette.middleware.sessions import SessionMiddleware
 
 from app.auth import SESSION_COOKIE, SESSION_MAX_AGE, router as auth_router
 from app.boards import router as board_router
+from app.chat import router as chat_router
 from app.database import initialize
 
 STATIC_DIR = Path(__file__).parent / "static"
@@ -50,6 +51,7 @@ def create_app(
 
     api.include_router(auth_router)
     api.include_router(board_router)
+    api.include_router(chat_router)
 
     @api.exception_handler(sqlite3.Error)
     async def database_error(request: Request, error: sqlite3.Error):
