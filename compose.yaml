@@ -10,7 +10,7 @@ services:
     environment:
       SESSION_SECRET: ${SESSION_SECRET:-}
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
-      OPENROUTER_MODEL: ${OPENROUTER_MODEL:-inclusionai/ling-3.2-flash:free}
+      OPENROUTER_MODEL: ${OPENROUTER_MODEL:-nvidia/nemotron-3.5-super-vl:free}
     volumes:
       - kanban-data:/data
 

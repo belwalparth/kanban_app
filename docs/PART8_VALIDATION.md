@@ -1,5 +1,7 @@
 # Part 8 validation
 
+Historical milestone: Part 9 subsequently changed the default to `nvidia/nemotron-3.5-super-vl:free` after testing the full board contract. See [Part 9 validation](PART9_VALIDATION.md). The arithmetic result below records the original Part 8 check.
+
 Verified on 2026-11-17 using Docker Desktop Linux containers and the root `.env` configuration.
 
 ## Model selection and live result

@@ -1,8 +1,9 @@
-from typing import Annotated, Self
+from typing import Annotated, Literal, Self, get_args
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
 
-COLUMN_IDS = ("backlog", "todo", "in-progress", "review", "done")
+ColumnId = Literal["backlog", "todo", "in-progress", "review", "done"]
+COLUMN_IDS = get_args(ColumnId)
 Title = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
 Identifier = Annotated[str, StringConstraints(min_length=1, pattern=r"\S")]
 
@@ -23,13 +24,13 @@ class Card(StrictModel):
 
 
 class Column(StrictModel):
-    id: Identifier
+    id: ColumnId
     title: Title
     cards: list[Card]
 
 
 class Board(StrictModel):
-    columns: list[Column]
+    columns: Annotated[list[Column], Field(min_length=5, max_length=5)]
 
     @model_validator(mode="after")
     def validate_structure(self) -> Self:

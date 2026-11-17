@@ -22,7 +22,7 @@ Open http://localhost:8000 after starting. Stop preserves the `kanban-data` volu
 
 The Windows commands permit the script for that process only; they do not change system execution policy.
 
-No settings are required for the board. Optionally set a long random `SESSION_SECRET` in root `.env` to retain sessions across restarts; otherwise startup generates a key. Sessions use an eight-hour HttpOnly cookie. AI connectivity uses `OPENROUTER_API_KEY` from `.env`, passed only to the backend at runtime. Default model: `inclusionai/ling-3.2-flash:free`; optionally override `OPENROUTER_MODEL` with another explicit `:free` model.
+No settings are required for the board. Optionally set a long random `SESSION_SECRET` in root `.env` to retain sessions across restarts; otherwise startup generates a key. Sessions use an eight-hour HttpOnly cookie. AI connectivity uses `OPENROUTER_API_KEY` from `.env`, passed only to the backend at runtime. Default model: `nvidia/nemotron-3.5-super-vl:free`; optionally override `OPENROUTER_MODEL` with another explicit `:free` model.
 
 To check live AI connectivity after starting (one free-model arithmetic request):
 
@@ -30,7 +30,13 @@ To check live AI connectivity after starting (one free-model arithmetic request)
 docker compose exec -T app python -m app.check_ai
 ```
 
-Expect `2+2 = 4; structured response validated.` Chat and AI board updates are later parts.
+Expect `2+2 = 4; structured response validated.` To check chat and a combined board update against a disposable synthetic database:
+
+```sh
+docker compose exec -T app python -m app.check_chat
+```
+
+This makes two live requests and leaves your saved board untouched. The authenticated `POST /api/chat` endpoint is ready; the sidebar is Part 10. See [chat API and checks](docs/PART9_VALIDATION.md).
 
 ## Tests
 

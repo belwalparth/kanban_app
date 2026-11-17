@@ -2,7 +2,7 @@ import os
 
 import httpx2 as httpx
 
-DEFAULT_MODEL = "inclusionai/ling-3.2-flash:free"
+DEFAULT_MODEL = "nvidia/nemotron-3.5-super-vl:free"
 API_URL = "https://openrouter.ai/api/v1/chat/completions"
 TIMEOUT_SECONDS = 30.0
 

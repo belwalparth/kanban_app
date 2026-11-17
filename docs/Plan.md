@@ -154,25 +154,27 @@ Tests:
 
 Success: real backend connectivity works with a free model; ordinary tests need neither network nor API key. If no suitable free model is available, document the evidence and resolve the blocker before claiming completion.
 
-Completed 2026-11-17 using `inclusionai/ling-3.2-flash:free`. Live arithmetic returned integer 4 in valid structured JSON. Final backend suite: 104 passed with mocked provider calls. See `docs/PART8_VALIDATION.md`. Part 9 has not started.
+Completed 2026-11-17 using `inclusionai/ling-3.2-flash:free`. Live arithmetic returned integer 4 in valid structured JSON. Final backend suite: 104 passed with mocked provider calls. See `docs/PART8_VALIDATION.md`. User subsequently approved Part 9; its fuller contract validation selected a different free model.
 
 ## Part 9: Structured AI board updates
 
-- [ ] Add an authenticated chat endpoint accepting a user message, conversation history, and board revision.
-- [ ] Load the canonical board from SQLite and send its JSON, message, and bounded history to OpenRouter.
-- [ ] Define structured output with assistant text and an optional complete updated board. Preserve fixed columns and unchanged IDs; support multiple create/edit/move actions per request.
-- [ ] Validate structured responses and proposed board state before writing. Commit valid changes atomically using the revision read before the AI call.
-- [ ] Reject stale/invalid updates without changing storage; return canonical saved board/revision for successful changes.
-- [ ] Keep chat history in browser-session memory for the MVP, bounded by message/history limits; clear it on logout. No chat database tables are required.
+- [x] Add an authenticated chat endpoint accepting a user message, conversation history, and board revision.
+- [x] Load the canonical board from SQLite and send its JSON, message, and bounded history to OpenRouter.
+- [x] Define structured output with assistant text and an optional complete updated board. Preserve fixed columns and unchanged IDs; support multiple create/edit/move actions per request.
+- [x] Validate structured responses and proposed board state before writing. Commit valid changes atomically using the revision read before the AI call.
+- [x] Reject stale/invalid updates without changing storage; return canonical saved board/revision for successful changes.
+- [x] Accept bounded client-held history without storing it in database tables. Browser session history and logout clearing will be wired with the sidebar in Part 10.
 
 Tests:
 
-- [ ] Mock answer-only replies and single/multiple create/edit/move actions, including combinations.
-- [ ] Test malformed output, duplicate IDs, changed columns, provider errors, unauthorized requests, and stale revisions after concurrent edits.
-- [ ] Verify rejected responses preserve the board and valid multi-card changes commit together.
-- [ ] Run a separate live structured-output smoke test for an answer and a board update.
+- [x] Mock answer-only replies and single/multiple create/edit/move actions, including combinations.
+- [x] Test malformed output, duplicate IDs, changed columns, provider errors, unauthorized requests, and stale revisions after concurrent edits.
+- [x] Verify rejected responses preserve the board and valid multi-card changes commit together.
+- [x] Run a separate live structured-output smoke test for an answer and a board update.
 
 Success: AI replies and validated multi-card changes work for the authenticated user's board without overwriting newer edits.
+
+Completed 2026-11-17. Final backend suite: 147 passed with networking disabled. Live answer-only and combined create/edit/move checks passed using `nvidia/nemotron-3.5-super-vl:free` and a disposable synthetic database. See `docs/PART9_VALIDATION.md`. Part 10 has not started.
 
 ## Part 10: Chat sidebar and final verification
 
