@@ -3,11 +3,13 @@
 import { useEffect, useRef, useState } from "react";
 import { BoardApiError, loadBoard, saveBoard, type BoardState } from "./board-api";
 import type { Column } from "./board";
+import { sendChat, type ChatMessage, type ChatResult } from "./chat-api";
 
 export function useBoard(onSessionExpired?: () => void) {
   const [state, setState] = useState<BoardState | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [chatting, setChatting] = useState(false);
   const [blocked, setBlocked] = useState(false);
   const [error, setError] = useState("");
   const [attempt, setAttempt] = useState(0);
@@ -74,5 +76,53 @@ export function useBoard(onSessionExpired?: () => void) {
       if (mounted.current) setSaving(false);
     }
   }
-  return { state, loading, saving, blocked, error, generation, save, reload };
+  async function chat(message: string, history: ChatMessage[]): Promise<ChatResult> {
+    if (!state || inFlight.current || loading || blocked) return { error: "Wait for the board to be ready before sending." };
+    inFlight.current = true;
+    setChatting(true);
+    setError("");
+    try {
+      const response = await sendChat(state.revision, message, history);
+      if (!mounted.current) return { error: "Your session has ended." };
+      setState(response.state);
+      setGeneration((value) => value + 1);
+      return { response };
+    } catch (failure) {
+      if (!mounted.current) return { error: "Your session has ended." };
+      const status = failure instanceof BoardApiError ? failure.status : 0;
+      if (status === 401) {
+        onSessionExpired?.();
+        return { error: "Your session expired. Please sign in again." };
+      }
+      if (status === 409) {
+        setBlocked(true);
+        try {
+          const latest = await loadBoard();
+          if (!mounted.current) return { error: "Your session has ended." };
+          setState(latest);
+          setGeneration((value) => value + 1);
+          setBlocked(false);
+          return { error: "This board changed elsewhere. The latest version is loaded. Review it before sending again." };
+        } catch (reloadFailure) {
+          if (!mounted.current) return { error: "Your session has ended." };
+          if (reloadFailure instanceof BoardApiError && reloadFailure.status === 401) onSessionExpired?.();
+          setError("Couldn't load the latest board. Reload the board before editing or sending again.");
+          return { error: "This board changed elsewhere. Reload the board before sending again." };
+        }
+      }
+      if (![422, 502, 503, 504].includes(status)) {
+        setBlocked(true);
+        setError("Couldn't confirm the AI result. Reload the board and review it before sending again.");
+      }
+      return { error: status === 502 ? "The AI returned an unusable response. You can try again."
+        : status === 503 ? "AI is unavailable or busy. Please try again later."
+        : status === 504 ? "The AI took too long to respond. You can try again."
+        : status === 422 ? "The message couldn't be accepted. Edit it and try again."
+        : "Couldn't confirm the result. Reload the board and review it before sending again." };
+    } finally {
+      inFlight.current = false;
+      if (mounted.current) setChatting(false);
+    }
+  }
+  return { state, loading, saving, chatting, blocked, error, generation, save, reload, chat };
 }

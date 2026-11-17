@@ -6,6 +6,8 @@ test.beforeEach(async ({ page }) => {
 });
 
 test("static board hydrates with no failed assets or runtime errors", async ({ page, request }) => {
+  // Finish the initial load before navigation; otherwise reload cancels its board request.
+  await expect(page.getByRole("article")).toHaveCount(6);
   const failures: string[] = [];
   page.on("pageerror", (error) => failures.push(error.message));
   page.on("requestfailed", (request) => failures.push(request.url()));

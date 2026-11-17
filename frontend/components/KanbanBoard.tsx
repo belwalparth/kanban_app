@@ -3,6 +3,7 @@
 import { useState, type DragEvent } from "react";
 import { CardEditor } from "@/components/CardEditor";
 import { ColumnTitle } from "@/components/ColumnTitle";
+import { ChatSidebar } from "@/components/ChatSidebar";
 import { useBoard } from "@/lib/use-board";
 import {
   addCardToColumn, deleteCardFromColumn, editCardInColumn,
@@ -15,13 +16,13 @@ export function KanbanBoard({ username, onSignOut, signingOut = false, onSession
   signingOut?: boolean;
   onSessionExpired?: () => void;
 }) {
-  const { state, loading, saving, blocked, error, generation, save, reload } = useBoard(onSessionExpired);
+  const { state, loading, saving, chatting, blocked, error, generation, save, reload, chat } = useBoard(onSessionExpired);
   const [draggedCard, setDraggedCard] = useState<{ cardId: string; sourceColumnId: string } | null>(null);
   const [dropTarget, setDropTarget] = useState<string | null>(null);
   const [editor, setEditor] = useState<{ columnId: string; card?: Card } | null>(null);
   const [announcement, setAnnouncement] = useState("");
   const columns = state?.board.columns ?? [];
-  const busy = saving || loading || blocked || signingOut;
+  const busy = saving || chatting || loading || blocked || signingOut;
   const totalCards = columns.reduce((sum, column) => sum + column.cards.length, 0);
   const completedCards = columns.find((column) => column.id === "done")?.cards.length ?? 0;
   const progress = totalCards ? Math.round(completedCards / totalCards * 100) : 0;
@@ -65,12 +66,13 @@ export function KanbanBoard({ username, onSignOut, signingOut = false, onSession
       <header className="workspace-bar">
         <div className="wordmark"><span className="brand-mark" aria-hidden="true"><i /><i /><i /></span>Kanban<span className="wordmark-divider" /> <span className="workspace-name">My workspace</span></div>
         <div className="workspace-actions"><span className="workspace-badge"><span aria-hidden="true" />{username ?? "Demo workspace"}</span>
-          {onSignOut && <button type="button" className="quiet-button" onClick={onSignOut} disabled={signingOut || saving}>{signingOut ? "Signing out..." : "Sign out"}</button>}
+          {onSignOut && <button type="button" className="quiet-button" onClick={onSignOut} disabled={signingOut || saving || chatting}>{signingOut ? "Signing out..." : "Sign out"}</button>}
         </div>
       </header>
 
+      <div className="workspace-content">
       <div className="board-shell">
-        {error && !editor && <div className="board-error"><p role="alert">{error}</p><button className="quiet-button" onClick={reload} disabled={saving || loading}>Reload board</button></div>}
+        {error && !editor && <div className="board-error"><p role="alert">{error}</p><button className="quiet-button" onClick={reload} disabled={saving || chatting || loading}>Reload board</button></div>}
         <div className="breadcrumb"><span>Workspace</span><span aria-hidden="true">/</span><span>Project board</span></div>
         <header className="board-header">
           <div className="board-header-copy">
@@ -125,7 +127,9 @@ export function KanbanBoard({ username, onSignOut, signingOut = false, onSession
             ))}
           </div>
         </div>
-        <footer className="board-note"><span className="note-dot" aria-hidden="true" /><p role="status">{saving ? "Saving changes..." : loading ? "Loading your board..." : error ? "Some changes were not saved." : "Your board is saved."}</p></footer>
+        <footer className="board-note"><span className="note-dot" aria-hidden="true" /><p role="status">{chatting ? "AI request in progress..." : saving ? "Saving changes..." : loading ? "Loading your board..." : error ? "Some changes were not saved." : "Your board is saved."}</p></footer>
+      </div>
+      <ChatSidebar pending={chatting} disabled={saving || loading || blocked || signingOut || !!editor} onSend={chat} />
       </div>
       <p aria-live="polite" className="sr-only">{announcement}</p>
       {editor && <CardEditor card={editor.card} columnId={editor.columnId} columns={columns} pending={busy} error={error} onSave={saveCard} onClose={() => setEditor(null)} />}

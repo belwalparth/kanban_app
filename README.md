@@ -1,6 +1,6 @@
 # Kanban app
 
-A local project management MVP. Sign in with `user` / `password` to create, edit, delete, and move cards or rename columns. FastAPI serves the static Next.js UI and API from one container. Board changes persist in SQLite across refresh, logout, and container restarts.
+A local project management MVP. Sign in with `user` / `password` to manage cards and columns, or ask the board assistant to create, edit, and move cards. FastAPI serves the static Next.js UI and API from one container. Board changes persist in SQLite across refresh, logout, and container restarts.
 
 ## Getting started
 
@@ -36,7 +36,7 @@ Expect `2+2 = 4; structured response validated.` To check chat and a combined bo
 docker compose exec -T app python -m app.check_chat
 ```
 
-This makes two live requests and leaves your saved board untouched. The authenticated `POST /api/chat` endpoint is ready; the sidebar is Part 10. See [chat API and checks](docs/PART9_VALIDATION.md).
+This makes two live requests and leaves your saved board untouched. In the browser, use **Board assistant** beside the board (below it on narrow screens). AI changes appear immediately and are saved. Conversation history stays in memory and clears on reload or sign out. Failed requests retain the draft for explicit retry; conflicts load the latest board for review. See [final checks](docs/PART10_VALIDATION.md) and [chat API](docs/PART9_VALIDATION.md).
 
 ## Tests
 
@@ -53,4 +53,4 @@ For frontend development with Node.js 24 or newer, keep Docker running at port 8
 
 Browser tests require the app running at port 8000. From `frontend/`, run `npx playwright install chromium` once, then `npm run test:e2e`. To use an installed Google Chrome instead, set `$env:PLAYWRIGHT_CHANNEL = 'chrome'` in PowerShell before running the tests.
 
-Most browser checks mock board responses for isolation. The real persistence check creates and cleans up only its own temporary card; it does not reset your board.
+Most browser checks mock board/chat responses for isolation. The real persistence check creates and cleans up only its own temporary card; it does not reset your board. The live AI browser test is opt-in and requires a disposable app at port 8001; see the final checks document.

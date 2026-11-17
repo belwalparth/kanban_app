@@ -174,23 +174,25 @@ Tests:
 
 Success: AI replies and validated multi-card changes work for the authenticated user's board without overwriting newer edits.
 
-Completed 2026-11-17. Final backend suite: 147 passed with networking disabled. Live answer-only and combined create/edit/move checks passed using `nvidia/nemotron-3.5-super-vl:free` and a disposable synthetic database. See `docs/PART9_VALIDATION.md`. Part 10 has not started.
+Completed 2026-11-17. Final backend suite: 147 passed with networking disabled. Live answer-only and combined create/edit/move checks passed using `nvidia/nemotron-3.5-super-vl:free` and a disposable synthetic database. See `docs/PART9_VALIDATION.md`. User subsequently approved Part 10.
 
 ## Part 10: Chat sidebar and final verification
 
-- [ ] Build a responsive sidebar with history, input, submit, pending, and error states using the agreed palette.
-- [ ] Connect authenticated chat and prevent duplicate pending submissions.
-- [ ] Apply returned canonical board/revision immediately to shared board state after AI changes.
-- [ ] Provide errors/conflict feedback and explicit retry, retaining drafts where useful; do not silently repeat writes.
-- [ ] Render assistant text safely, support labels/focus/keyboard access, and clear chat on logout.
-- [ ] Update minimal run/test documentation and record validation results and untested platforms in `docs/`.
+- [x] Build a responsive sidebar with history, input, submit, pending, and error states using the agreed palette.
+- [x] Connect authenticated chat and prevent duplicate pending submissions.
+- [x] Apply returned canonical board/revision immediately to shared board state after AI changes.
+- [x] Provide errors/conflict feedback and explicit retry, retaining drafts where useful; do not silently repeat writes.
+- [x] Render assistant text safely, support labels/focus/keyboard access, and clear chat on logout.
+- [x] Update minimal run/test documentation and record validation results and untested platforms in `docs/`.
 
 Tests:
 
-- [ ] Component tests cover history/submission, pending state, errors/retry, answer-only replies, and board refresh.
-- [ ] Browser tests cover login, persistent manual edits, mocked AI multi-card changes, reload, and logout.
-- [ ] Run backend/frontend suites, type/lint checks, production build, and Docker smoke checks.
-- [ ] Perform a separate live end-to-end AI check and inspect desktop/narrow layouts and keyboard interactions.
+- [x] Component tests cover history/submission, pending state, errors/retry, answer-only replies, and board refresh.
+- [x] Browser tests cover login, persistent manual edits, mocked AI multi-card changes, reload, and logout.
+- [x] Run backend/frontend suites, type/lint checks, production build, and Docker smoke checks.
+- [x] Perform a separate live end-to-end AI check and inspect desktop/narrow layouts and keyboard interactions.
 
 Success: users manage a persistent board manually and through chat, see AI changes immediately, and retain board data across container restarts. Report actual check results and limitations.
+
+Completed 2026-11-17. Backend: 147 passed with networking disabled. Frontend: 55 passed; lint, typecheck, and production export passed. Browser: 40 passed, 4 intentional skips; separate live AI browser check passed against a disposable container, including exact combined create/edit/move validation and persistence through its restart. See `docs/PART10_VALIDATION.md` for checks, isolation, and platform limits.
 
