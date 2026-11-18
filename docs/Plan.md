@@ -2,15 +2,16 @@
 
 ## Agreed decisions and scope
 
-- One local Docker container: FastAPI serves the statically exported Next.js UI and `/api/*`; SQLite lives in a persistent Docker volume. Use `uv` for Python dependencies.
-- MVP credentials are `user` / `password`. One board per signed-in user; database design supports future users. No registration or board switching.
+- Completed local MVP: one Docker container where FastAPI serves the statically exported Next.js UI and `/api/*`; SQLite lives in a persistent Docker volume. Use `uv` for Python dependencies. Retain this local development option.
+- Next release (requested 2026-11-18): add Google sign-in and deploy the app on Vercel. Google authentication replaces the shared `user` / `password` login in production. Each Google user owns one private board, created on first sign-in; no board switching or password registration.
+- Deployment target: Vercel-hosted frontend and FastAPI API with same-origin `/api/*` routing, plus managed PostgreSQL for durable production storage. Vercel function storage cannot replace the local SQLite volume. Verify current Vercel Python/runtime, routing, and execution limits before choosing the exact project configuration in Part 11.
 - Store each board as JSON inside SQLite, rather than in a JSON file.
 - Preserve the existing five column IDs. Columns can be renamed, but not added, deleted, or reordered. Support card creation, title/details editing, deletion, and cross-column movement. Moves append to the destination; no card reordering feature is required.
 - Use root `Agents.md` colors: yellow `#ecad0a`, blue `#209dd7`, purple `#753991`, navy `#032147`, and supporting gray `#888888`. This supersedes brown and cream.
 - Any free OpenRouter model is permitted. Verify current chat and structured-output support before selecting one; the originally named Recraft model is not mandatory.
-- Keep `OPENROUTER_API_KEY` in the root `.env`, passed to the backend at runtime. Never put it in browser code, generated assets, logs, or the image.
+- Keep local secrets in the root `.env`, passed to the backend at runtime. Configure production secrets in Vercel environment settings. Never put `OPENROUTER_API_KEY`, Google client secrets, session secrets, or database credentials in browser code, generated assets, logs, or the image.
 - Verify current supported library versions using official sources during implementation; update configuration and lockfiles together. No dependency versions or provider capabilities were verified during Part 1.
-- Keep implementation simple. Diagnose failures with evidence before fixing them. Record actual validation results and any checks that could not be run.
+- Keep implementation simple. Diagnose failures with evidence before fixing them. Record actual validation results and any checks that could not be run.git
 
 ## Baseline at Part 1
 
@@ -195,4 +196,87 @@ Tests:
 Success: users manage a persistent board manually and through chat, see AI changes immediately, and retain board data across container restarts. Report actual check results and limitations.
 
 Completed 2026-11-17. Backend: 147 passed with networking disabled. Frontend: 55 passed; lint, typecheck, and production export passed. Browser: 40 passed, 4 intentional skips; separate live AI browser check passed against a disposable container, including exact combined create/edit/move validation and persistence through its restart. See `docs/PART10_VALIDATION.md` for checks, isolation, and platform limits.
+
+## Part 11: Google authentication and Vercel architecture
+
+Parts 1-10 describe the completed local MVP. Parts 11-15 are planned work; the new production requirements supersede the earlier local-only and shared-login limitations.
+
+- [x] Verify current official Vercel guidance for deploying the static Next.js frontend and Python FastAPI API, including project roots, build outputs, `/api/*` routing, supported Python versions, lifespan behavior, and function duration limits. Record the supported configuration before implementation.
+- [x] Keep FastAPI responsible for authentication, board storage, and OpenRouter calls. Preserve same-origin browser API requests and keep frontend routing from swallowing API or OAuth callback routes.
+- [x] Select managed PostgreSQL with serverless-compatible connections; document provider setup, connection limits, and separate development/preview/production databases. Retain SQLite for local Docker use without changing board JSON or revision behavior.
+- [x] Select a maintained Python Google OpenID Connect integration using authorization code flow with state, nonce, and PKCE. Verify library and provider support using current official documentation.
+- [x] Document Google OAuth consent-screen setup, required `openid email profile` scopes, test-user behavior, and exact callback paths for localhost and stable preview/production hostnames. Cloud hostnames remain explicit placeholders until account setup; test-user lists do not restrict basic identity scopes.
+- [x] Document server-only settings: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `SESSION_SECRET`, `APP_BASE_URL`, `DATABASE_URL`, and existing OpenRouter settings. Production requires configured secrets and HTTPS; no generated per-instance session secret or shared-password fallback.
+- [x] Update `docs/DATABASE.md` with identity and PostgreSQL migration details before implementation. Keep historical validation documents unchanged.
+
+Validation: review the proposed hosting configuration against official platform documentation and trace sign-in, callback, authenticated board/chat requests, and durable writes across function instances. Record verified capabilities and unresolved account/setup prerequisites in `docs/`.
+
+Success: a documented, supported deployment architecture and Google callback configuration, with production storage and authentication requirements defined.
+
+Completed 2026-11-18. See `docs/AUTH_DEPLOYMENT.md` for the selected single-project FastAPI/static-export Vercel architecture, Neon/Psycopg storage, Authlib Google flow, environment contract, and setup instructions. `docs/DATABASE.md` adds the planned identity/OAuth-state schema and migration behavior. See `docs/PART11_VALIDATION.md` for official sources, design walkthroughs, and checks still requiring implementation/account access. No runtime code or cloud resources changed.
+
+## Part 12: Durable production storage and Google identities
+
+- [ ] Add the PostgreSQL connection path and explicit schema migration/setup command; do not run destructive migrations during function startup. Preserve SQLite support for local Docker development.
+- [ ] Add a unique Google identity keyed by validated issuer and subject (`iss`, `sub`) linked to the internal user ID. Store display name/email only as profile information; never match or merge accounts by email alone.
+- [ ] Create the user identity and its initial board transactionally on the first successful Google sign-in. Concurrent or repeated callbacks must not create duplicate identities/boards or reset saved data.
+- [ ] Resolve authenticated sessions through the internal user ID. Keep ownership outside client-controlled board JSON and apply it to board and chat operations.
+- [ ] Preserve atomic whole-board writes, validation, and conditional revision updates on both databases. Keep provider calls outside database transactions.
+- [ ] Define the existing demo board migration explicitly: back up SQLite, preserve JSON and revisions, and import into a deliberately selected Google account through an operator command if wanted. Never assign the shared demo board to the first public sign-in automatically.
+
+Tests:
+
+- [ ] Run storage integration tests against SQLite and an isolated PostgreSQL database for initialization, rollback, uniqueness, ownership, and stale revisions.
+- [ ] Test repeated/concurrent first sign-ins, two Google identities, changed email for the same subject, and the same email on different subjects.
+- [ ] Verify production data survives new connections, function restarts, and redeployment; verify any migration against a disposable database before importing real data.
+
+Success: each Google identity has exactly one isolated, durable board; saved data and conflict protection survive deployment lifecycle changes.
+
+## Part 13: Google sign-in and authenticated sessions
+
+- [ ] Add Google sign-in start/callback endpoints and replace the production login form with a clearly labeled Google sign-in action. Keep demo credentials available only through explicit local development configuration, disabled in production.
+- [ ] Validate OAuth state, nonce, PKCE, token signature, issuer, audience, and expiration using the selected library. Reject replayed/mismatched callbacks and restrict post-login redirects to approved application paths. Request no Google API scopes or offline refresh tokens beyond sign-in needs.
+- [ ] Establish an expiring app session after verified sign-in and clear the temporary OAuth state. Keep provider tokens out of browser storage and app session payloads.
+- [ ] Configure HttpOnly, Secure production cookies and SameSite behavior compatible with Google's callback. Protect cookie-authenticated mutation endpoints, including logout, against CSRF through an explicit origin/token strategy.
+- [ ] Keep session lookup and logout behavior, restore sessions on reload, and clear private board/chat state on logout or expiration. App logout clears the app session without signing the user out of Google.
+- [ ] Require authenticated ownership on every board/chat route. Preserve no-store responses for session and private data; static UI assets can remain public.
+- [ ] Handle cancelled consent, provider errors, expired sessions, and unavailable configuration with clear retry behavior and no credential/token logging.
+
+Tests:
+
+- [ ] Mock Google authorization/token responses for success, cancellation, invalid/replayed state, nonce mismatch, bad/expired tokens, provider failure, and unsafe redirect attempts.
+- [ ] Verify cookie attributes, expiration, tampering rejection, logout, CSRF rejection, and disabled demo login in production configuration.
+- [ ] Verify two signed-in users cannot read, manually edit, or AI-edit each other's boards; unauthenticated board/chat calls return 401.
+- [ ] Component/browser tests cover sign-in navigation, callback errors, session restoration, logout, expiration, and private-state clearing. Use mocked identity flows in routine tests; perform real Google sign-in separately with a test account.
+
+Success: verified Google users can sign in, resume their own board, and sign out securely; production never grants access through the shared MVP password.
+
+## Part 14: Vercel configuration and preview deployment
+
+- [ ] Add the verified Vercel build/entrypoint/routing configuration for frontend and FastAPI. Adjust Python/dependency configuration to supported runtimes and verify the backend's `uv` dependency installation path.
+- [ ] Configure database connections and app initialization for short-lived/concurrent function instances. No production database file, identity, or session state may depend on an instance's memory or filesystem.
+- [ ] Configure server-side OpenRouter timeout and function duration so AI requests fit platform limits and failures leave the board unchanged. Return useful errors without silently replaying writes.
+- [ ] Prepare separate preview and production secrets/databases, Google callback registrations, and stable `APP_BASE_URL` values. Keep preview traffic isolated from production boards.
+- [ ] Document a minimal deployment procedure, schema migration step, Google setup, environment variables, and rollback procedure in `docs/`; keep README concise.
+- [ ] Run all local checks and prepare a reviewable deployment configuration. When account access/settings are available, deploy a preview and configure its stable callback URL.
+
+Tests:
+
+- [ ] Run backend/frontend suites, lint, TypeScript checks, and production builds; retain local Docker sign-in/board/chat regression coverage.
+- [ ] Verify preview `/`, static assets, `/api/health`, auth/callback routes, and missing-resource behavior over HTTPS.
+- [ ] Verify session continuity across function instances, cookie forwarding, no caching of private responses, and durable board writes with PostgreSQL.
+- [ ] Run a separate preview AI smoke test and confirm provider failures/timeouts and revision conflicts preserve saved state.
+
+Success: a working HTTPS preview supports Google authentication and persistent manual/AI board updates using external storage and server-only secrets.
+
+## Part 15: Production release and verification
+
+- [ ] Configure the final Vercel production hostname, Google authorized callback, consent-screen publishing requirements, production database, and production environment settings.
+- [ ] Back up any data being migrated, apply verified migrations, and deploy the tested release. Keep existing local data intact unless an explicit import is performed.
+- [ ] Complete a real Google sign-in smoke test with two accounts: create/edit/move cards, rename columns, use AI, reload, sign out/in, and verify account isolation. Record any checks requiring interactive account access as pending until performed.
+- [ ] Verify saved boards survive a new deployment and concurrent manual/AI edits still return conflicts without lost writes.
+- [ ] Verify production error logging excludes secrets and tokens; document database backup/restore and app rollback steps, including schema compatibility.
+- [ ] Record deployed URL, actual check results, deployment/runtime limits, and remaining limitations in `docs/PART15_VALIDATION.md`.
+
+Success: the production Vercel app supports Google sign-in and private persistent boards with working chat; deployment and data recovery procedures are documented and verified where access permits.
 
