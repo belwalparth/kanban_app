@@ -8,6 +8,8 @@ services:
     ports:
       - "127.0.0.1:8000:8000"
     environment:
+      APP_ENV: local
+      ALLOW_DEMO_LOGIN: "true"
       SESSION_SECRET: ${SESSION_SECRET:-}
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
       OPENROUTER_MODEL: ${OPENROUTER_MODEL:-nvidia/nemotron-3.5-super-vl:free}

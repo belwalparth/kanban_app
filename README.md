@@ -2,6 +2,8 @@
 
 A local project management MVP. Sign in with `user` / `password` to manage cards and columns, or ask the board assistant to create, edit, and move cards. FastAPI serves the static Next.js UI and API from one container. Board changes persist in SQLite across refresh, logout, and container restarts.
 
+PostgreSQL storage and Google identity provisioning are available; Google sign-in arrives in Part 13. See [database setup and migration](docs/DATABASE_OPERATIONS.md). Compose explicitly enables local demo login; other runs require `APP_ENV=local` and `ALLOW_DEMO_LOGIN=true` to use it.
+
 ## Getting started
 
 Requires Docker with Compose (Docker Desktop on Windows/macOS), running Linux containers.

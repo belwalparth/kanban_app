@@ -2,7 +2,7 @@
 name = "kanban-backend"
 version = "0.1.0"
 requires-python = ">=3.14,<3.15"
-dependencies = ["fastapi", "httpx2", "itsdangerous", "uvicorn"]
+dependencies = ["fastapi", "httpx2", "itsdangerous", "psycopg[binary]", "uvicorn"]
 
 [dependency-groups]
 dev = ["pytest"]

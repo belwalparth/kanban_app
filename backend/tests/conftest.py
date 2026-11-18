@@ -4,6 +4,11 @@ from fastapi.testclient import TestClient
 from app.main import create_app
 
 
+@pytest.fixture(autouse=True)
+def local_demo(monkeypatch):
+    monkeypatch.setenv("ALLOW_DEMO_LOGIN", "true")
+
+
 @pytest.fixture
 def client(tmp_path):
     (tmp_path / "index.html").write_text("<h1>Project board</h1>", encoding="utf-8")

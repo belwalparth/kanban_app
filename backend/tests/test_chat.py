@@ -1,4 +1,5 @@
 import json
+import time
 from base64 import b64encode
 from copy import deepcopy
 
@@ -217,7 +218,7 @@ def test_second_user_chat_cannot_change_first_user_board(signed_in, ai):
     with connection(path) as db:
         owner = db.execute("INSERT INTO users (username) VALUES ('other')").lastrowid
         db.execute("INSERT INTO boards (user_id, board_json) VALUES (?, ?)", (owner, json.dumps(original["board"])))
-    cookie = TimestampSigner("test-session-secret").sign(b64encode(json.dumps({"username": "other"}).encode())).decode()
+    cookie = TimestampSigner("test-session-secret").sign(b64encode(json.dumps({"user_id": owner, "expires_at": int(time.time()) + 3600}).encode())).decode()
     changed = deepcopy(original["board"])
     changed["columns"][0]["title"] = "Other's update"
     ai.result["board"] = changed

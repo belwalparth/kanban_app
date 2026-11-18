@@ -217,20 +217,23 @@ Completed 2026-11-18. See `docs/AUTH_DEPLOYMENT.md` for the selected single-proj
 
 ## Part 12: Durable production storage and Google identities
 
-- [ ] Add the PostgreSQL connection path and explicit schema migration/setup command; do not run destructive migrations during function startup. Preserve SQLite support for local Docker development.
-- [ ] Add a unique Google identity keyed by validated issuer and subject (`iss`, `sub`) linked to the internal user ID. Store display name/email only as profile information; never match or merge accounts by email alone.
-- [ ] Create the user identity and its initial board transactionally on the first successful Google sign-in. Concurrent or repeated callbacks must not create duplicate identities/boards or reset saved data.
-- [ ] Resolve authenticated sessions through the internal user ID. Keep ownership outside client-controlled board JSON and apply it to board and chat operations.
-- [ ] Preserve atomic whole-board writes, validation, and conditional revision updates on both databases. Keep provider calls outside database transactions.
-- [ ] Define the existing demo board migration explicitly: back up SQLite, preserve JSON and revisions, and import into a deliberately selected Google account through an operator command if wanted. Never assign the shared demo board to the first public sign-in automatically.
+- [x] Add the PostgreSQL connection path and explicit schema migration/setup command; do not run destructive migrations during function startup. Preserve SQLite support for local Docker development.
+- [x] Add a unique Google identity keyed by validated issuer and subject (`iss`, `sub`) linked to the internal user ID. Store display name/email only as profile information; never match or merge accounts by email alone.
+- [x] Create the user identity and its initial board transactionally on the first successful Google sign-in. Concurrent or repeated callbacks must not create duplicate identities/boards or reset saved data.
+- [x] Resolve authenticated sessions through the internal user ID. Keep ownership outside client-controlled board JSON and apply it to board and chat operations.
+- [x] Preserve atomic whole-board writes, validation, and conditional revision updates on both databases. Keep provider calls outside database transactions.
+- [x] Define the existing demo board migration explicitly: back up SQLite, preserve JSON and revisions, and import into a deliberately selected Google account through an operator command if wanted. Never assign the shared demo board to the first public sign-in automatically.
 
 Tests:
 
-- [ ] Run storage integration tests against SQLite and an isolated PostgreSQL database for initialization, rollback, uniqueness, ownership, and stale revisions.
-- [ ] Test repeated/concurrent first sign-ins, two Google identities, changed email for the same subject, and the same email on different subjects.
-- [ ] Verify production data survives new connections, function restarts, and redeployment; verify any migration against a disposable database before importing real data.
+- [x] Run storage integration tests against SQLite and an isolated PostgreSQL database for initialization, rollback, uniqueness, ownership, and stale revisions.
+- [x] Test repeated/concurrent first sign-ins, two Google identities, changed email for the same subject, and the same email on different subjects.
+- [x] Verify reconnects, new app instances, PostgreSQL server restart, and migration/import against disposable databases.
+- [ ] Verify hosted production data across Vercel function restarts and redeployment (requires Parts 14-15 hosting setup).
 
 Success: each Google identity has exactly one isolated, durable board; saved data and conflict protection survive deployment lifecycle changes.
+
+Implementation completed 2026-11-18. PostgreSQL and SQLite storage, versioned migrations, Google identity provisioning, internal-ID sessions, and an explicit backed-up demo-board import are implemented. See `docs/PART12_VALIDATION.md` and `docs/DATABASE_OPERATIONS.md`. Hosted lifecycle verification remains pending for Parts 14-15; Google OAuth endpoints and state storage remain Part 13.
 
 ## Part 13: Google sign-in and authenticated sessions
 
@@ -279,4 +282,3 @@ Success: a working HTTPS preview supports Google authentication and persistent m
 - [ ] Record deployed URL, actual check results, deployment/runtime limits, and remaining limitations in `docs/PART15_VALIDATION.md`.
 
 Success: the production Vercel app supports Google sign-in and private persistent boards with working chat; deployment and data recovery procedures are documented and verified where access permits.
-

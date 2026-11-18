@@ -1,5 +1,4 @@
 import json
-from pathlib import Path
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -7,6 +6,7 @@ from pydantic import Field, StringConstraints, ValidationError
 from starlette.concurrency import run_in_threadpool
 
 from app.boards import CurrentUser, DatabasePath, read_board, update_board
+from app.database import Database
 from app.models import Board, BoardState, StrictModel, User
 from app.openrouter import OpenRouterClient, OpenRouterError
 
@@ -60,7 +60,7 @@ def get_ai_client() -> OpenRouterClient:
     return OpenRouterClient()
 
 
-async def answer_chat(request: ChatRequest, user: User, path: Path, ai: OpenRouterClient) -> ChatResponse:
+async def answer_chat(request: ChatRequest, user: User, path: Database, ai: OpenRouterClient) -> ChatResponse:
     snapshot = await run_in_threadpool(read_board, user, path)
     if request.revision != snapshot.revision:
         raise HTTPException(status_code=409, detail="Board changed; reload before sending your message")

@@ -1,4 +1,5 @@
 import json
+import time
 from base64 import b64encode
 from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy
@@ -162,7 +163,7 @@ def test_users_can_only_read_and_update_their_own_boards(authenticated):
         db.execute("INSERT INTO boards (user_id, board_json) VALUES (?, ?)", (other_id, json.dumps(second_board)))
 
     # Account management is out of scope; issue a signed test session for the seeded second user.
-    cookie = TimestampSigner("test-session-secret").sign(b64encode(json.dumps({"username": "other"}).encode())).decode()
+    cookie = TimestampSigner("test-session-secret").sign(b64encode(json.dumps({"user_id": other_id, "expires_at": int(time.time()) + 3600}).encode())).decode()
     with TestClient(authenticated.app) as other:
         other.cookies.set(SESSION_COOKIE, cookie)
         assert other.get("/api/board").json()["board"] == second_board
