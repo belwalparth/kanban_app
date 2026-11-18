@@ -1,16 +1,17 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { getSession, signIn, signOut } from "@/lib/auth";
+import { getAuthConfig, getSession, signIn, signOut } from "@/lib/auth";
 import { AuthGate } from "./AuthGate";
 import { resetBoardServer } from "@/test/board-server";
 import { BoardApiError, saveBoard } from "@/lib/board-api";
 
-vi.mock("@/lib/auth", () => ({ getSession: vi.fn(), signIn: vi.fn(), signOut: vi.fn() }));
+vi.mock("@/lib/auth", () => ({ getAuthConfig: vi.fn(), getSession: vi.fn(), signIn: vi.fn(), signOut: vi.fn() }));
 vi.mock("@/lib/board-api", async (original) => ({ ...await original<typeof import("@/lib/board-api")>(), loadBoard: vi.fn(), saveBoard: vi.fn() }));
 
 beforeEach(() => {
   vi.resetAllMocks();
+  vi.mocked(getAuthConfig).mockResolvedValue({ google: false, demo: true });
   vi.mocked(getSession).mockResolvedValue(null);
   vi.mocked(signIn).mockResolvedValue({ username: "user" });
   vi.mocked(signOut).mockResolvedValue(undefined);
@@ -151,4 +152,39 @@ describe("Authentication gate", () => {
     expect(await screen.findByRole("heading", { name: "Welcome back" })).toBeInTheDocument();
     expect(screen.queryByRole("article")).not.toBeInTheDocument();
   });
+});
+
+it("shows Google sign-in and hides demo credentials when demo login is disabled", async () => {
+  vi.mocked(getAuthConfig).mockResolvedValue({ google: true, demo: false });
+  render(<AuthGate />);
+  const link = await screen.findByRole("link", { name: "Continue with Google" });
+  expect(link).toHaveAttribute("href", "/api/auth/google/start");
+  expect(screen.queryByLabelText("Password")).not.toBeInTheDocument();
+  expect(screen.queryByText(/Demo access|Local demo access/)).not.toBeInTheDocument();
+});
+
+it("explains cancelled Google sign-in and removes the callback error from the URL", async () => {
+  window.history.replaceState(null, "", "/?auth_error=cancelled");
+  vi.mocked(getAuthConfig).mockResolvedValue({ google: true, demo: false });
+  render(<AuthGate />);
+  expect(await screen.findByRole("alert")).toHaveTextContent("Google sign-in was cancelled");
+  expect(window.location.search).toBe("");
+  expect(screen.getByRole("link", { name: "Continue with Google" })).toBeInTheDocument();
+});
+
+it("shows unavailable sign-in clearly when neither method is configured", async () => {
+  vi.mocked(getAuthConfig).mockResolvedValue({ google: false, demo: false });
+  render(<AuthGate />);
+  expect(await screen.findByText(/Sign-in is temporarily unavailable/)).toBeInTheDocument();
+  expect(screen.queryByLabelText("Password")).not.toBeInTheDocument();
+});
+
+it("clears the mounted private board when a focus check discovers a different account", async () => {
+  vi.mocked(getSession).mockResolvedValueOnce({ username: "Same name", id: 1 }).mockResolvedValueOnce({ username: "Same name", id: 2 });
+  render(<AuthGate />);
+  fireEvent.click(await screen.findByRole("button", { name: "Board assistant" }));
+  fireEvent.change(screen.getByLabelText("Message the assistant"), { target: { value: "First account private draft" } });
+  fireEvent.focus(window);
+  await screen.findByRole("button", { name: "Board assistant" });
+  expect(screen.queryByRole("dialog", { name: "Board assistant" })).not.toBeInTheDocument();
 });

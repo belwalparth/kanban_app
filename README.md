@@ -2,7 +2,7 @@
 
 A local project management MVP. Sign in with `user` / `password` to manage cards and columns, or ask the board assistant to create, edit, and move cards. FastAPI serves the static Next.js UI and API from one container. Board changes persist in SQLite across refresh, logout, and container restarts.
 
-PostgreSQL storage and Google identity provisioning are available; Google sign-in arrives in Part 13. See [database setup and migration](docs/DATABASE_OPERATIONS.md). Compose explicitly enables local demo login; other runs require `APP_ENV=local` and `ALLOW_DEMO_LOGIN=true` to use it.
+Google sign-in is available when configured; see [Google setup](docs/GOOGLE_SIGN_IN.md) and [database migrations](docs/DATABASE_OPERATIONS.md). Compose enables local demo login by default; set `ALLOW_DEMO_LOGIN=false` when using Google. Demo login is disabled in preview/production.
 
 ## Getting started
 
@@ -38,7 +38,7 @@ Expect `2+2 = 4; structured response validated.` To check chat and a combined bo
 docker compose exec -T app python -m app.check_chat
 ```
 
-This makes two live requests and leaves your saved board untouched. In the browser, use **Board assistant** beside the board (below it on narrow screens). AI changes appear immediately and are saved. Conversation history stays in memory and clears on reload or sign out. Failed requests retain the draft for explicit retry; conflicts load the latest board for review. See [final checks](docs/PART10_VALIDATION.md) and [chat API](docs/PART9_VALIDATION.md).
+This makes two live requests and leaves your saved board untouched. In the browser, select **Board assistant** above the columns to open the popup; close it with Escape or its close button. All five columns fit across the desktop board, with wrapping columns on smaller screens. AI changes appear immediately and are saved. Drafts/history survive closing the popup and clear on reload or sign out. Failed requests retain the draft for explicit retry; conflicts load the latest board for review. See [Part 13 checks](docs/PART13_VALIDATION.md) and [chat API](docs/PART9_VALIDATION.md).
 
 ## Tests
 

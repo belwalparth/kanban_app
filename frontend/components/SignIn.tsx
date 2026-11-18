@@ -1,13 +1,31 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
-import { signIn, type User } from "@/lib/auth";
+import { useEffect, useState, type FormEvent } from "react";
+import { signIn, type AuthConfig, type User } from "@/lib/auth";
 
-export function SignIn({ onSignedIn }: { onSignedIn: (user: User) => void }) {
+export function SignIn({ config, onSignedIn }: { config: AuthConfig; onSignedIn: (user: User) => void }) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
+  const [callbackError] = useState(() => {
+    const code = new URLSearchParams(window.location.search).get("auth_error");
+    if (!code) return "";
+    const errors: Record<string, string> = {
+      cancelled: "Google sign-in was cancelled. You can try again.",
+      invalid: "This sign-in attempt expired or was already used. Please start again.",
+      unavailable: "Google sign-in is unavailable. Please try again later.",
+      failed: "Google sign-in could not be verified. Please try again.",
+    };
+    return errors[code] ?? errors.failed;
+  });
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    if (url.searchParams.has("auth_error")) {
+      url.searchParams.delete("auth_error");
+      window.history.replaceState(null, "", url.pathname + url.search + url.hash);
+    }
+  }, []);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -38,7 +56,10 @@ export function SignIn({ onSignedIn }: { onSignedIn: (user: User) => void }) {
         <p className="eyebrow">Your workspace awaits</p>
         <h2 id="sign-in-heading">Welcome back</h2>
         <p>Sign in to get your project moving.</p>
-        <form onSubmit={handleSubmit} aria-label="Sign in">
+        {callbackError && <p className="auth-error" role="alert">{callbackError}</p>}
+        {config.google && <a className="google-sign-in" href="/api/auth/google/start">Continue with Google</a>}
+        {!config.google && !config.demo && <p role="status">Sign-in is temporarily unavailable. Please try again later.</p>}
+        {config.demo && <><form onSubmit={handleSubmit} aria-label="Sign in">
           <label htmlFor="username">Username</label>
           <input id="username" name="username" autoComplete="username" required value={username} onChange={(event) => setUsername(event.target.value)} disabled={pending} spellCheck={false} autoCapitalize="none" aria-describedby={error ? "sign-in-error" : undefined} />
           <label htmlFor="password">Password</label>
@@ -46,7 +67,7 @@ export function SignIn({ onSignedIn }: { onSignedIn: (user: User) => void }) {
           {error && <p className="auth-error" id="sign-in-error" role="alert">{error}</p>}
           <button className="primary-button" type="submit" disabled={pending}>{pending ? "Signing in..." : "Sign in"}</button>
         </form>
-        <p className="demo-credentials">Demo access: <code>user</code> / <code>password</code></p>
+        <p className="demo-credentials">Local demo access: <code>user</code> / <code>password</code></p></>}
       </section>
     </div>
   );

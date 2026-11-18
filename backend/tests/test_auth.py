@@ -24,15 +24,15 @@ def test_missing_session_is_unauthorized_and_not_cached(client):
 def test_login_sets_signed_cookie_and_restores_session(client):
     response = client.post("/api/auth/login", json=VALID_CREDENTIALS)
     assert response.status_code == 200
-    assert response.json() == {"username": "user"}
+    assert response.json() == {"username": "user", "id": 1}
     cookie = response.headers["set-cookie"].lower()
     assert "httponly" in cookie
-    assert "samesite=strict" in cookie
+    assert "samesite=lax" in cookie
     assert "path=/" in cookie
     assert f"max-age={SESSION_MAX_AGE}" in cookie
     assert "; secure" not in cookie  # MVP is served on local HTTP.
     assert "password" not in cookie
-    assert client.get("/api/auth/session").json() == {"username": "user"}
+    assert client.get("/api/auth/session").json() == {"username": "user", "id": 1}
 
 
 @pytest.mark.parametrize("credentials", [
@@ -98,7 +98,7 @@ def test_secret_controls_session_validity_across_app_instances(client, tmp_path)
     client.post("/api/auth/login", json=VALID_CREDENTIALS)
     cookie = client.cookies.get(SESSION_COOKIE)
     for secret, expected_status in [("test-session-secret", 200), ("different-secret", 401)]:
-        with TestClient(create_app(tmp_path, session_secret=secret, database_path=tmp_path / "test.db")) as other_client:
+        with TestClient(create_app(tmp_path, session_secret=secret, database_path=tmp_path / "test.db"), headers={"Origin": "http://testserver"}) as other_client:
             other_client.cookies.set(SESSION_COOKIE, cookie)
             assert other_client.get("/api/auth/session").status_code == expected_status
 

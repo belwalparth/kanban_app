@@ -222,7 +222,7 @@ def test_second_user_chat_cannot_change_first_user_board(signed_in, ai):
     changed = deepcopy(original["board"])
     changed["columns"][0]["title"] = "Other's update"
     ai.result["board"] = changed
-    with TestClient(signed_in.app) as other:
+    with TestClient(signed_in.app, headers={"Origin": "http://testserver"}) as other:
         other.cookies.set(SESSION_COOKIE, cookie)
         response = other.post("/api/chat", json={"revision": 0, "message": "Rename backlog"})
         assert response.status_code == 200

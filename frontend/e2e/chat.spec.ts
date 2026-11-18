@@ -3,6 +3,7 @@ import { expect, test } from "./fixtures";
 test.beforeEach(async ({ page }) => {
   await page.request.post("/api/auth/login", { data: { username: "user", password: "password" } });
   await page.goto("/");
+  await page.getByRole("button", { name: "Board assistant", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Board assistant" })).toBeVisible();
 });
 
@@ -27,16 +28,20 @@ test("AI multi-card changes appear immediately, survive reload, and keep manual 
   await page.keyboard.press("Enter");
   await expect(page.getByText("Board updated and saved.")).toBeVisible();
   await expect(input).toBeFocused();
+  await page.getByRole("button", { name: "Close assistant" }).click();
   await expect(page.locator('[data-column="done"]').getByRole("article", { name: "AI onboarding done" })).toBeVisible();
   await page.reload();
   await expect(page.getByRole("article", { name: "AI release checklist" })).toBeVisible();
+  await page.getByRole("button", { name: "Board assistant", exact: true }).click();
   await expect(page.getByRole("log")).not.toContainText("Created a checklist");
+  await page.getByRole("button", { name: "Close assistant" }).click();
   await page.getByRole("button", { name: "Delete AI release checklist" }).click();
   await expect(page.getByRole("article", { name: "AI release checklist" })).toHaveCount(0);
   await page.getByRole("button", { name: "Sign out", exact: true }).click();
   await page.getByLabel("Username", { exact: true }).fill("user");
   await page.getByLabel("Password", { exact: true }).fill("password");
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  await page.getByRole("button", { name: "Board assistant", exact: true }).click();
   await expect(input).toHaveValue("");
   await expect(page.getByRole("log")).not.toContainText("Create a checklist and edit/move");
   await expect(page.getByRole("article", { name: "AI onboarding done" })).toBeVisible();
@@ -60,6 +65,7 @@ test("answer-only replies forward history, display plain text, and clear on logo
   await expect(input).toHaveValue("");
   expect(calls).toBe(2);
   expect(boardStore.state.revision).toBe(0);
+  await page.getByRole("button", { name: "Close assistant" }).click();
   await page.getByRole("button", { name: "Sign out", exact: true }).click();
   await expect(page.getByRole("log")).toHaveCount(0);
 });
@@ -76,11 +82,13 @@ test("pending requests block duplicate actions and provider failures retain the 
   const input = page.getByLabel("Message the assistant");
   await input.fill("Keep this draft");
   await page.getByRole("button", { name: "Send message" }).click();
-  await expect(page.getByRole("button", { name: "Working..." })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Working...", exact: true })).toBeDisabled();
+  await page.getByRole("button", { name: "Close assistant" }).click();
   await expect(page.getByRole("button", { name: "Delete Draft onboarding" })).toBeDisabled();
   await expect(page.getByRole("button", { name: "Sign out", exact: true })).toBeDisabled();
+  await page.getByRole("button", { name: "Assistant working..." }).click();
   release();
-  await expect(page.getByRole("complementary", { name: "Board assistant" }).getByRole("alert")).toContainText("AI is unavailable");
+  await expect(page.getByRole("dialog", { name: "Board assistant" }).getByRole("alert")).toContainText("AI is unavailable");
   await expect(input).toHaveValue("Keep this draft");
   expect(calls).toBe(1);
   await page.getByRole("button", { name: "Send again" }).click();
@@ -95,7 +103,7 @@ test("conflicts reload canonical state and keep requests explicit; expiry clears
   });
   await page.getByLabel("Message the assistant").fill("Move a card");
   await page.getByRole("button", { name: "Send message" }).click();
-  await expect(page.getByRole("complementary", { name: "Board assistant" }).getByRole("alert")).toContainText("latest version is loaded");
+  await expect(page.getByRole("dialog", { name: "Board assistant" }).getByRole("alert")).toContainText("latest version is loaded");
   await expect(page.getByLabel("Rename Fresh backlog")).toHaveValue("Fresh backlog");
   await page.unroute("**/api/chat");
   await page.route("**/api/chat", (route) => route.fulfill({ status: 401, json: { detail: "Expired" } }));
@@ -104,8 +112,8 @@ test("conflicts reload canonical state and keep requests explicit; expiry clears
   await expect(page.getByRole("log")).toHaveCount(0);
 });
 
-test("sidebar fits desktop and narrow screens without page overflow", async ({ page }, testInfo) => {
-  const sidebar = page.getByRole("complementary", { name: "Board assistant" });
+test("assistant dialog fits desktop and narrow screens without page overflow", async ({ page }, testInfo) => {
+  const sidebar = page.getByRole("dialog", { name: "Board assistant" });
   await sidebar.scrollIntoViewIfNeeded();
   const box = (await sidebar.boundingBox())!;
   const width = page.viewportSize()!.width;
@@ -113,4 +121,25 @@ test("sidebar fits desktop and narrow screens without page overflow", async ({ p
   expect(box.x + box.width).toBeLessThanOrEqual(width);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   await page.screenshot({ path: `test-results/chat-${testInfo.project.name}.png`, fullPage: true });
+});
+
+test("columns fit without horizontal scrolling and assistant closes with Escape", async ({ page }, testInfo) => {
+  await page.keyboard.press("Escape");
+  const launcher = page.getByRole("button", { name: "Board assistant", exact: true });
+  await expect(launcher).toBeFocused();
+  const columns = page.getByRole("region", { name: "Kanban columns" });
+  expect(await columns.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
+  if (testInfo.project.name === "desktop") {
+    const boxes = await page.locator(".column").evaluateAll((elements) => elements.map((element) => ({
+      top: element.getBoundingClientRect().top, left: element.getBoundingClientRect().left, right: element.getBoundingClientRect().right,
+    })));
+    expect(new Set(boxes.map((box) => box.top)).size).toBe(1);
+    expect(boxes[0].left).toBeGreaterThanOrEqual(0);
+    expect(boxes[4].right).toBeLessThanOrEqual(page.viewportSize()!.width);
+  }
+  await launcher.click();
+  await page.getByLabel("Message the assistant").fill("Draft stays on close");
+  await page.keyboard.press("Escape");
+  await launcher.click();
+  await expect(page.getByLabel("Message the assistant")).toHaveValue("Draft stays on close");
 });

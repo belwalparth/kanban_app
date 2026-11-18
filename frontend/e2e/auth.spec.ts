@@ -23,7 +23,7 @@ test("login is required, errors are clear, and the session survives reload", asy
   const cookies = await page.context().cookies();
   const session = cookies.find((cookie) => cookie.name === "kanban_session")!;
   expect(session.httpOnly).toBe(true);
-  expect(session.sameSite).toBe("Strict");
+  expect(session.sameSite).toBe("Lax");
   expect(await page.evaluate(() => document.cookie)).not.toContain("kanban_session");
 });
 

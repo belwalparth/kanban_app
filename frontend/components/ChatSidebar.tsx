@@ -1,9 +1,11 @@
 "use client";
 
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type FormEvent } from "react";
 import type { ChatMessage, ChatResult } from "@/lib/chat-api";
 
-export function ChatSidebar({ pending, disabled, onSend }: {
+export function ChatSidebar({ open, onClose, pending, disabled, onSend }: {
+  open: boolean;
+  onClose: () => void;
   pending: boolean;
   disabled: boolean;
   onSend: (message: string, history: ChatMessage[]) => Promise<ChatResult>;
@@ -17,10 +19,19 @@ export function ChatSidebar({ pending, disabled, onSend }: {
   const input = useRef<HTMLTextAreaElement>(null);
   const end = useRef<HTMLDivElement>(null);
   const wasPending = useRef(false);
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  useLayoutEffect(() => {
+    if (!open) return;
+    const dialog = dialogRef.current!;
+    const trigger = document.activeElement as HTMLElement;
+    dialog.showModal();
+    input.current?.focus();
+    return () => { dialog.close(); trigger?.focus(); };
+  }, [open]);
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
   useEffect(() => { end.current?.scrollIntoView?.({ block: "nearest" }); }, [history, pending, error]);
   useEffect(() => {
-    if (wasPending.current && !pending) input.current?.focus();
+    if (wasPending.current && !pending && dialogRef.current?.open) input.current?.focus();
     wasPending.current = pending;
   }, [pending]);
 
@@ -42,12 +53,13 @@ export function ChatSidebar({ pending, disabled, onSend }: {
       }
     } finally {
       locked.current = false;
-      if (mounted.current) input.current?.focus();
+      if (mounted.current && dialogRef.current?.open) input.current?.focus();
     }
   }
 
-  return <aside className="chat-sidebar" aria-labelledby="chat-heading">
-    <header className="chat-heading"><p className="eyebrow">A helping hand</p><h2 id="chat-heading">Board assistant</h2>
+  return <dialog id="assistant-dialog" ref={dialogRef} className="chat-dialog" aria-labelledby="chat-heading" onCancel={(event) => { event.preventDefault(); onClose(); }}>
+    <div className="chat-sidebar">
+    <header className="chat-heading"><button type="button" className="icon-button chat-close" aria-label="Close assistant" onClick={onClose}>&times;</button><p className="eyebrow">A helping hand</p><h2 id="chat-heading">Board assistant</h2>
       <p>Ask a question, or describe the cards you want to create, edit, or move.</p></header>
     <div className="chat-history" role="log" aria-label="Chat conversation" aria-live="polite" aria-relevant="additions" tabIndex={0}>
       {history.length === 0 && <p className="chat-empty">Try: “Create a release checklist in To do.”</p>}
@@ -66,5 +78,6 @@ export function ChatSidebar({ pending, disabled, onSend }: {
       {notice && <p className="chat-notice" role="status">{notice}</p>}
       <button className="primary-button" type="submit" disabled={pending || disabled || !draft.trim()}>{pending ? "Working..." : error ? "Send again" : "Send message"}</button>
     </form>
-  </aside>;
+    </div>
+  </dialog>;
 }

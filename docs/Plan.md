@@ -237,22 +237,31 @@ Implementation completed 2026-11-18. PostgreSQL and SQLite storage, versioned mi
 
 ## Part 13: Google sign-in and authenticated sessions
 
-- [ ] Add Google sign-in start/callback endpoints and replace the production login form with a clearly labeled Google sign-in action. Keep demo credentials available only through explicit local development configuration, disabled in production.
-- [ ] Validate OAuth state, nonce, PKCE, token signature, issuer, audience, and expiration using the selected library. Reject replayed/mismatched callbacks and restrict post-login redirects to approved application paths. Request no Google API scopes or offline refresh tokens beyond sign-in needs.
-- [ ] Establish an expiring app session after verified sign-in and clear the temporary OAuth state. Keep provider tokens out of browser storage and app session payloads.
-- [ ] Configure HttpOnly, Secure production cookies and SameSite behavior compatible with Google's callback. Protect cookie-authenticated mutation endpoints, including logout, against CSRF through an explicit origin/token strategy.
-- [ ] Keep session lookup and logout behavior, restore sessions on reload, and clear private board/chat state on logout or expiration. App logout clears the app session without signing the user out of Google.
-- [ ] Require authenticated ownership on every board/chat route. Preserve no-store responses for session and private data; static UI assets can remain public.
-- [ ] Handle cancelled consent, provider errors, expired sessions, and unavailable configuration with clear retry behavior and no credential/token logging.
+- [x] Add Google sign-in start/callback endpoints and replace the production login form with a clearly labeled Google sign-in action. Keep demo credentials available only through explicit local development configuration, disabled in production.
+- [x] Validate OAuth state, nonce, PKCE, token signature, issuer, audience, and expiration using the selected library. Reject replayed/mismatched callbacks and restrict post-login redirects to approved application paths. Request no Google API scopes or offline refresh tokens beyond sign-in needs.
+- [x] Establish an expiring app session after verified sign-in and clear the temporary OAuth state. Keep provider tokens out of browser storage and app session payloads.
+- [x] Configure HttpOnly, Secure production cookies and SameSite behavior compatible with Google's callback. Protect cookie-authenticated mutation endpoints, including logout, against CSRF through an explicit origin/token strategy.
+- [x] Keep session lookup and logout behavior, restore sessions on reload, and clear private board/chat state on logout or expiration. App logout clears the app session without signing the user out of Google.
+- [x] Require authenticated ownership on every board/chat route. Preserve no-store responses for session and private data; static UI assets can remain public.
+- [x] Handle cancelled consent, provider errors, expired sessions, and unavailable configuration with clear retry behavior and no credential/token logging.
 
 Tests:
 
-- [ ] Mock Google authorization/token responses for success, cancellation, invalid/replayed state, nonce mismatch, bad/expired tokens, provider failure, and unsafe redirect attempts.
-- [ ] Verify cookie attributes, expiration, tampering rejection, logout, CSRF rejection, and disabled demo login in production configuration.
-- [ ] Verify two signed-in users cannot read, manually edit, or AI-edit each other's boards; unauthenticated board/chat calls return 401.
-- [ ] Component/browser tests cover sign-in navigation, callback errors, session restoration, logout, expiration, and private-state clearing. Use mocked identity flows in routine tests; perform real Google sign-in separately with a test account.
+- [x] Mock Google authorization/token responses for success, cancellation, invalid/replayed state, nonce mismatch, bad/expired tokens, provider failure, and unsafe redirect attempts.
+- [x] Verify cookie attributes, expiration, tampering rejection, logout, CSRF rejection, and disabled demo login in production configuration.
+- [x] Verify two signed-in users cannot read, manually edit, or AI-edit each other's boards; unauthenticated board/chat calls return 401.
+- [x] Component/browser tests cover sign-in navigation, callback errors, session restoration, logout, expiration, and private-state clearing. Routine checks use mocked identity flows.
+- [ ] Perform real Google sign-in separately with a test account after configuring Google client settings and a stable session secret.
 
 Success: verified Google users can sign in, resume their own board, and sign out securely; production never grants access through the shared MVP password.
+
+Additional UI request:
+
+- [x] Replace the permanent AI sidebar with an on-demand modal that preserves drafts/history on close, supports Escape, and restores focus.
+- [x] Fit all five columns in a desktop row; wrap columns on smaller screens without horizontal scrolling.
+- [x] Verify popup lifecycle, pending requests, persistence, Google sign-in navigation/errors, account-state clearing, and desktop/mobile layout in component/browser tests.
+
+Implementation completed 2026-11-18. See `docs/PART13_VALIDATION.md` and `docs/GOOGLE_SIGN_IN.md`. Real Google sign-in remains pending because Google credentials/session configuration are absent locally; no cloud deployment or account registration was performed.
 
 ## Part 14: Vercel configuration and preview deployment
 

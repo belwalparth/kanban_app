@@ -1,4 +1,4 @@
-# Database operations (Part 12)
+# Database operations
 
 Run from `backend/` with Python 3.14 and `uv`, or inside the app container using `python -m app.manage_db`. Psycopg 3.3.9 is locked with its binary wheel; current Python 3.14 support was verified against [official installation guidance](https://www.psycopg.org/psycopg3/docs/basic/install.html) and [release notes](https://www.psycopg.org/psycopg3/docs/news.html) on 2026-11-18.
 
@@ -10,7 +10,7 @@ Use a new, empty PostgreSQL database for each preview/production environment. Su
 uv run --locked python -m app.manage_db migrate
 ```
 
-Version 1 creates users, JSONB boards, and Google identities in one transaction, recording `schema_migrations.version = 1`. Repeating it preserves data. Concurrent PostgreSQL migration commands serialize through a transaction advisory lock. An incompatible schema or failed statement rolls back; do not edit an applied migration. Future schema changes require new versions. PostgreSQL startup only checks the recorded version; it never migrates or seeds demo records. Grant the runtime role SELECT/INSERT/UPDATE/DELETE on these tables and sequence usage; run migrations under the schema owner.
+Version 1 creates users, JSONB boards, and Google identities; version 2 adds one-time OAuth attempts. The command applies missing migrations transactionally and records both versions. Repeating it preserves data. Concurrent PostgreSQL migration commands serialize through a transaction advisory lock. An incompatible schema or failed statement rolls back; do not edit an applied migration. Future schema changes require new versions. PostgreSQL startup requires versions 1 and 2; it never migrates or seeds demo records. Grant the runtime role SELECT/INSERT/UPDATE/DELETE on these tables and sequence usage; run migrations under the schema owner.
 
 Local SQLite remains supported. Before an explicit migration of an existing file, create a consistent backup with SQLite's backup API:
 
@@ -18,9 +18,9 @@ Local SQLite remains supported. Before an explicit migration of an existing file
 uv run --locked python -m app.manage_db migrate --sqlite /data/kanban.db --backup /data/kanban-before-google.db
 ```
 
-For a new file omit `--backup`. The command refuses an existing backup path. On the first normal local startup with the legacy schema, the application automatically backs up to `<DATABASE_PATH>.pre-google.db` before applying the additive migration. Preserve this file outside deployment assets. Existing board JSON, user IDs, and revisions remain intact. Later starts do not repeat the migration or backup.
+For a new file omit `--backup`. The command refuses an existing backup path. On the first normal local startup with the legacy schema, the application automatically backs up to `<DATABASE_PATH>.pre-google.db`; upgrading a version-1 database creates `<DATABASE_PATH>.pre-oauth.db`. Preserve these files outside deployment assets. Existing board JSON, user IDs, and revisions remain intact. Later starts do not repeat the migration or backup.
 
-Local Compose explicitly enables `APP_ENV=local` and `ALLOW_DEMO_LOGIN=true`. Outside Compose, demo login defaults to disabled. Cloud modes reject demo login and require PostgreSQL plus a configured session secret. `DATABASE_URL` never falls back to SQLite when unavailable. Google endpoints, production cookies, CSRF, and full OAuth settings validation are Part 13.
+Local Compose defaults to `APP_ENV=local` and `ALLOW_DEMO_LOGIN=true`; root `.env` can disable demo login. Outside Compose, demo login defaults to disabled. Cloud modes reject demo login and require PostgreSQL, HTTPS, Google client settings, and a configured session secret. `DATABASE_URL` never falls back to SQLite when unavailable. See [Google sign-in](GOOGLE_SIGN_IN.md) for cookies, CSRF, and settings.
 
 ## Deliberate demo-board import
 

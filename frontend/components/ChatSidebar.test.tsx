@@ -5,19 +5,21 @@ import { KanbanBoard } from "./KanbanBoard";
 import { AuthGate } from "./AuthGate";
 import { BoardApiError, loadBoard, saveBoard } from "@/lib/board-api";
 import { sendChat, type ChatResponse } from "@/lib/chat-api";
-import { getSession, signIn, signOut } from "@/lib/auth";
+import { getAuthConfig, getSession, signIn, signOut } from "@/lib/auth";
 import { resetBoardServer, stored } from "@/test/board-server";
 
 vi.mock("@/lib/chat-api", () => ({ sendChat: vi.fn() }));
-vi.mock("@/lib/auth", () => ({ getSession: vi.fn(), signIn: vi.fn(), signOut: vi.fn() }));
+vi.mock("@/lib/auth", () => ({ getAuthConfig: vi.fn(), getSession: vi.fn(), signIn: vi.fn(), signOut: vi.fn() }));
 vi.mock("@/lib/board-api", async (original) => ({ ...await original<typeof import("@/lib/board-api")>(), loadBoard: vi.fn(), saveBoard: vi.fn() }));
 beforeEach(() => {
   vi.resetAllMocks();
+  vi.mocked(getAuthConfig).mockResolvedValue({ google: false, demo: true });
   resetBoardServer();
   vi.mocked(sendChat).mockImplementation(async () => ({ reply: "Six cards.", updated: false, state: structuredClone(stored) }));
 });
 async function show() {
   render(<KanbanBoard />);
+  fireEvent.click(await screen.findByRole("button", { name: "Board assistant" }));
   await screen.findByRole("heading", { name: "Board assistant" });
 }
 function submit(message = "Count the cards") {
@@ -137,6 +139,7 @@ it("clears history and drafts on logout and returns to login when chat expires",
   vi.mocked(signIn).mockResolvedValue({ username: "user" });
   vi.mocked(signOut).mockResolvedValue(undefined);
   render(<AuthGate />);
+  fireEvent.click(await screen.findByRole("button", { name: "Board assistant" }));
   await screen.findByRole("heading", { name: "Board assistant" });
   submit();
   await screen.findByText("Six cards.");
@@ -147,6 +150,7 @@ it("clears history and drafts on logout and returns to login when chat expires",
   await user.type(screen.getByLabelText("Username"), "user");
   await user.type(screen.getByLabelText("Password"), "password");
   await user.click(screen.getByRole("button", { name: "Sign in" }));
+  fireEvent.click(await screen.findByRole("button", { name: "Board assistant" }));
   await screen.findByRole("heading", { name: "Board assistant" });
   expect(screen.getByLabelText("Message the assistant")).toHaveValue("");
   expect(screen.queryByText("Six cards.")).not.toBeInTheDocument();
@@ -154,4 +158,23 @@ it("clears history and drafts on logout and returns to login when chat expires",
   submit();
   await screen.findByLabelText("Username");
   expect(screen.queryByRole("log")).not.toBeInTheDocument();
+});
+
+it("opens on demand, preserves drafts and history on close, and restores launcher focus", async () => {
+  render(<KanbanBoard />);
+  const launcher = await screen.findByRole("button", { name: "Board assistant" });
+  expect(screen.queryByRole("dialog", { name: "Board assistant" })).not.toBeInTheDocument();
+  launcher.focus();
+  fireEvent.click(launcher);
+  expect(screen.getByLabelText("Message the assistant")).toHaveFocus();
+  submit("Remember this question");
+  await screen.findByText("Six cards.");
+  fireEvent.change(screen.getByLabelText("Message the assistant"), { target: { value: "Keep this draft" } });
+  fireEvent.click(screen.getByRole("button", { name: "Close assistant" }));
+  expect(launcher).toHaveFocus();
+  expect(launcher).toHaveAttribute("aria-expanded", "false");
+  fireEvent.click(launcher);
+  expect(screen.getByLabelText("Message the assistant")).toHaveValue("Keep this draft");
+  expect(screen.getByRole("log")).toHaveTextContent("Remember this question");
+  expect(screen.getByRole("log")).toHaveTextContent("Six cards.");
 });

@@ -2,7 +2,7 @@
 
 Status: approved by the user for Part 6 on 2026-11-16. The schema and authenticated board API are implemented, and Part 7 connects the frontend to them. See [backend validation](PART6_VALIDATION.md) and [frontend persistence validation](PART7_VALIDATION.md).
 
-The sections through Approval describe the historical local MVP. Part 12 implements PostgreSQL storage, additive SQLite migrations, Google identity provisioning, and internal-ID session ownership. See [database operations](DATABASE_OPERATIONS.md). OAuth state storage and the sign-in flow remain Part 13; the Part 11 design below describes the combined target.
+The sections through Approval describe the historical local MVP. Parts 12-13 implement PostgreSQL storage, additive SQLite migrations, Google identity provisioning, internal-ID sessions, and database-backed OAuth attempts. See [database operations](DATABASE_OPERATIONS.md) and [Google sign-in](GOOGLE_SIGN_IN.md). The Part 11 design below records the combined target.
 
 ## Storage and ownership
 

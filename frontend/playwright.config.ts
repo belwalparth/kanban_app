@@ -5,6 +5,7 @@ export default defineConfig({
   fullyParallel: true,
   use: {
     baseURL: process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:8000",
+    extraHTTPHeaders: { Origin: process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:8000" },
     channel: process.env.PLAYWRIGHT_CHANNEL,
     trace: "retain-on-failure",
     screenshot: "only-on-failure",

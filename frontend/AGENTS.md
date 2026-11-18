@@ -34,7 +34,9 @@ Read the root `Agents.md` and `docs/Plan.md` before changes. Follow the approved
 
 Five fixed column IDs: `backlog`, `todo`, `in-progress`, `review`, `done`. Display titles are editable. Cards have `id`, `title`, and `details`. Moves append to the destination; same-column drops do nothing.
 
-Sign-in uses `user` / `password` with a backend-signed cookie. Board data loads from SQLite through `/api/board` and persists across reload/logout/restart. Logout/expired sessions unmount private UI; signing in loads the saved board. Chat uses `/api/chat` and applies the returned canonical board immediately. Manual edits, reload, and logout are disabled during AI requests; chat is disabled during manual saves or open card editors. Conflicts retain the chat draft for explicit resubmission after review, without replaying it.
+Sign-in options come from `/api/auth/config`: Google when configured, and `user` / `password` only in explicit local demo mode. Sessions use an eight-hour backend-signed cookie and an internal user ID; profile names are display data. Board data loads through `/api/board` from SQLite or PostgreSQL and persists across reload/logout/restart. Logout/expired sessions and account changes unmount private UI; signing in loads the owned board. Chat uses `/api/chat` and applies the canonical board immediately. Manual edits, reload, and logout are disabled during AI requests; chat is disabled during manual saves or open card editors. Conflicts retain the chat draft for explicit resubmission after review, without replaying it.
+
+`ChatSidebar.tsx` now renders an on-demand native modal dialog, launched by **Board assistant** above the columns. It stays mounted to retain drafts/history on close, restores launcher focus, and supports Escape. All five columns fit on desktop; smaller screens wrap columns without horizontal scrolling. Do not restore the permanent sidebar or a fixed minimum board width.
 
 All supported operations save through the same board/revision state. Do not show optimistic data as committed: apply the canonical API response on success. Retain failed card/rename drafts and leave failed deletes/moves unchanged. On 409, load the current server board without replaying the edit; if loading fails, block edits until reload succeeds. A 401 returns the app to sign-in. `DEFAULT_COLUMNS` is a test reference, not a production loading fallback.
 
@@ -50,7 +52,7 @@ Run from `frontend/`:
 - `npm run lint`: ESLint CLI; Next.js no longer runs lint as part of its build.
 - `npm run test:e2e`: Playwright tests; requires a running app and installed Chromium/Chrome.
 
-Current validation and manual checks are in `docs/PART10_VALIDATION.md`; prior parts document earlier milestones.
+Current validation and manual checks are in `docs/PART13_VALIDATION.md` and `docs/GOOGLE_SIGN_IN.md`; prior parts document earlier milestones.
 
 ## Change conventions
 

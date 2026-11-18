@@ -10,6 +10,7 @@ test("live AI answers and creates, edits, and moves cards through the sidebar", 
   await page.getByLabel("Username", { exact: true }).fill("user");
   await page.getByLabel("Password", { exact: true }).fill("password");
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  await page.getByRole("button", { name: "Board assistant", exact: true }).click();
   const input = page.getByLabel("Message the assistant");
   await input.fill("How many cards are on this board? Answer with the count. Do not change the board.");
   await page.getByRole("button", { name: "Send message" }).click();
@@ -28,8 +29,10 @@ test("live AI answers and creates, edits, and moves cards through the sidebar", 
   expected.board.columns[4].cards.push(moved);
   expected.board.columns[1].cards.push({ id: "live-chat-check", title: "Live release checklist", details: "Synthetic browser check" });
   expect(await (await page.request.get("/api/board")).json()).toEqual(expected);
+  await page.getByRole("button", { name: "Close assistant" }).click();
   await expect(page.getByRole("article", { name: "Live release checklist", exact: true })).toBeVisible();
   await page.reload();
   await expect(page.getByRole("article", { name: "Live onboarding updated", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Board assistant", exact: true }).click();
   await expect(page.getByRole("log")).not.toContainText("Synthetic browser check");
 });

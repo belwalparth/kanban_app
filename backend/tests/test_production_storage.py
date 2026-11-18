@@ -52,7 +52,7 @@ def test_migration_repeatable_without_demo_seed(store):
     check_schema(store)
     assert count(store, "users") == count(store, "boards") == 0
     with connection(store) as db:
-        assert db.execute("SELECT version FROM schema_migrations").fetchone()["version"] == 1
+        assert sorted(row["version"] for row in db.execute("SELECT version FROM schema_migrations").fetchall()) == [1, 2]
 
 
 def test_identity_profile_and_email_are_not_ownership(store):
@@ -146,14 +146,14 @@ def test_internal_id_sessions_isolate_users_and_survive_new_app(store, tmp_path)
     first, second = google(store), google(store, "two")
     options = {"database_url": store} if is_postgres(store) else {"database_path": store}
     for user, label in [(first, "First private"), (second, "Second private")]:
-        with TestClient(create_app(tmp_path, session_secret="identity-test-secret", allow_demo_login=False, **options)) as client:
+        with TestClient(create_app(tmp_path, session_secret="identity-test-secret", allow_demo_login=False, **options), headers={"Origin": "http://testserver"}) as client:
             client.cookies.set(SESSION_COOKIE, cookie(user))
             state = client.get("/api/board").json()
             state["board"]["columns"][0]["title"] = label
             assert client.put("/api/board", json=state).status_code == 200
     assert read_board(first, store).board.columns[0].title == "First private"
     assert read_board(second, store).board.columns[0].title == "Second private"
-    with TestClient(create_app(tmp_path, session_secret="identity-test-secret", allow_demo_login=False, **options)) as client:
+    with TestClient(create_app(tmp_path, session_secret="identity-test-secret", allow_demo_login=False, **options), headers={"Origin": "http://testserver"}) as client:
         assert client.post("/api/auth/login", json={"username": "user", "password": "password"}).status_code == 403
         client.cookies.set(SESSION_COOKIE, cookie(first))
         assert client.get("/api/board").json()["board"]["columns"][0]["title"] == "First private"
@@ -193,6 +193,7 @@ def test_legacy_sqlite_migration_preserves_saved_data(tmp_path):
     with connection(target) as db:
         db.execute("DROP TABLE google_identities")
         db.execute("DROP TABLE schema_migrations")
+        db.execute("DROP TABLE oauth_login_states")
         db.execute("UPDATE boards SET revision = 9")
         original = db.execute("SELECT board_json FROM boards").fetchone()["board_json"]
     migrate(target)
@@ -256,8 +257,55 @@ def test_local_upgrade_backs_up_legacy_database(tmp_path):
     with connection(target) as db:
         db.execute("DROP TABLE google_identities")
         db.execute("DROP TABLE schema_migrations")
+        db.execute("DROP TABLE oauth_login_states")
         db.execute("UPDATE boards SET revision = 11")
     initialize(target, demo=False)
     with connection(tmp_path / "legacy-local.db.pre-google.db") as db:
         assert db.execute("SELECT revision FROM boards").fetchone()["revision"] == 11
     assert count(target, "google_identities") == 0
+
+
+def test_oauth_attempt_is_single_use_across_concurrent_connections(store):
+    from app.database import consume_login_attempt, hash_login_value, save_login_attempt
+    save_login_attempt(store, "raw-state", "raw-binding", "nonce", "server-verifier")
+    with connection(store) as db:
+        row = db.execute("SELECT state_hash, browser_binding_hash FROM oauth_login_states").fetchone()
+        assert row["state_hash"] == hash_login_value("raw-state")
+        assert row["browser_binding_hash"] == hash_login_value("raw-binding")
+    assert consume_login_attempt(store, "raw-state", "wrong-browser") is None
+    barrier = Barrier(2)
+    def consume(_):
+        barrier.wait(timeout=10)
+        return consume_login_attempt(store, "raw-state", "raw-binding")
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        results = list(pool.map(consume, range(2)))
+    assert results.count(None) == 1
+    assert next(result for result in results if result) == {"nonce": "nonce", "code_verifier": "server-verifier"}
+    save_login_attempt(store, "expired", "binding", "nonce", "verifier")
+    with connection(store) as db:
+        db.execute("UPDATE oauth_login_states SET expires_at = 0")
+    assert consume_login_attempt(store, "expired", "binding") is None
+    save_login_attempt(store, "new", "binding", "nonce", "verifier")
+    assert count(store, "oauth_login_states") == 1
+
+
+def test_version_one_sqlite_upgrade_backs_up_board_and_preserves_revision(tmp_path):
+    target = tmp_path / "version-one.db"
+    initialize(target)
+    with connection(target) as db:
+        db.execute("DROP TABLE oauth_login_states")
+        db.execute("DELETE FROM schema_migrations WHERE version = 2")
+        db.execute("UPDATE boards SET revision = 23")
+        before = dict(db.execute("SELECT board_json, revision FROM boards").fetchone())
+    initialize(target, demo=False)
+    backup = tmp_path / "version-one.db.pre-oauth.db"
+    with connection(backup) as db:
+        assert dict(db.execute("SELECT board_json, revision FROM boards").fetchone()) == before
+        assert [row["version"] for row in db.execute("SELECT version FROM schema_migrations")] == [1]
+        assert db.execute("SELECT name FROM sqlite_master WHERE name = 'oauth_login_states'").fetchone() is None
+    with connection(target) as db:
+        assert dict(db.execute("SELECT board_json, revision FROM boards").fetchone()) == before
+        assert sorted(row["version"] for row in db.execute("SELECT version FROM schema_migrations")) == [1, 2]
+    initialize(target, demo=False)
+    with connection(target) as db:
+        assert dict(db.execute("SELECT board_json, revision FROM boards").fetchone()) == before

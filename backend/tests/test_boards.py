@@ -164,7 +164,7 @@ def test_users_can_only_read_and_update_their_own_boards(authenticated):
 
     # Account management is out of scope; issue a signed test session for the seeded second user.
     cookie = TimestampSigner("test-session-secret").sign(b64encode(json.dumps({"user_id": other_id, "expires_at": int(time.time()) + 3600}).encode())).decode()
-    with TestClient(authenticated.app) as other:
+    with TestClient(authenticated.app, headers={"Origin": "http://testserver"}) as other:
         other.cookies.set(SESSION_COOKIE, cookie)
         assert other.get("/api/board").json()["board"] == second_board
         state = other.get("/api/board").json()
@@ -215,7 +215,7 @@ def test_concurrent_saves_allow_exactly_one_winner(authenticated):
     def save(label):
         state = deepcopy(original)
         state["board"]["columns"][0]["title"] = label
-        with TestClient(authenticated.app) as tab:
+        with TestClient(authenticated.app, headers={"Origin": "http://testserver"}) as tab:
             tab.cookies.set(SESSION_COOKIE, cookie)
             barrier.wait(timeout=10)
             return tab.put("/api/board", json=state)
@@ -234,6 +234,6 @@ def test_saved_empty_board_survives_app_restart_and_relogin(authenticated, tmp_p
         column["cards"] = []
     saved = authenticated.put("/api/board", json=state).json()
     authenticated.post("/api/auth/logout")
-    with TestClient(create_app(tmp_path, database_path=database_path(authenticated))) as restarted:
+    with TestClient(create_app(tmp_path, database_path=database_path(authenticated)), headers={"Origin": "http://testserver"}) as restarted:
         restarted.post("/api/auth/login", json={"username": "user", "password": "password"})
         assert restarted.get("/api/board").json() == saved

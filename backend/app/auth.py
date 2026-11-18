@@ -4,7 +4,7 @@ import time
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel
 
-from app.database import find_user, find_user_by_id, get_database_path
+from app.database import find_user, find_user_by_id, get_database_path, user_display_name
 from app.models import User
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -29,7 +29,7 @@ def require_user(request: Request) -> User:
 
 
 @router.post("/login")
-def login(credentials: Credentials, request: Request) -> dict[str, str]:
+def login(credentials: Credentials, request: Request) -> dict[str, str | int]:
     request.session.clear()
     if not request.app.state.allow_demo_login:
         raise HTTPException(status_code=403, detail="Demo login is disabled")
@@ -39,12 +39,17 @@ def login(credentials: Credentials, request: Request) -> dict[str, str]:
     if user is None:
         raise HTTPException(status_code=401, detail="Not authenticated")
     request.session.update(user_id=user.id, expires_at=int(time.time()) + SESSION_MAX_AGE)
-    return {"username": "user"}
+    return {"username": "user", "id": user.id}
 
 
 @router.get("/session")
-def session(user: Annotated[User, Depends(require_user)]) -> dict[str, str]:
-    return {"username": user.username}
+def session(request: Request, user: Annotated[User, Depends(require_user)]) -> dict[str, str | int]:
+    return {"username": user_display_name(get_database_path(request), user), "id": user.id}
+
+
+@router.get("/config")
+def configuration(request: Request) -> dict[str, bool]:
+    return {"google": request.app.state.auth_settings.google_enabled, "demo": request.app.state.allow_demo_login}
 
 
 @router.post("/logout", status_code=204)

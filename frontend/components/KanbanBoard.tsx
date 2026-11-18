@@ -21,6 +21,7 @@ export function KanbanBoard({ username, onSignOut, signingOut = false, onSession
   const [dropTarget, setDropTarget] = useState<string | null>(null);
   const [editor, setEditor] = useState<{ columnId: string; card?: Card } | null>(null);
   const [announcement, setAnnouncement] = useState("");
+  const [assistantOpen, setAssistantOpen] = useState(false);
   const columns = state?.board.columns ?? [];
   const busy = saving || chatting || loading || blocked || signingOut;
   const totalCards = columns.reduce((sum, column) => sum + column.cards.length, 0);
@@ -89,7 +90,9 @@ export function KanbanBoard({ username, onSignOut, signingOut = false, onSession
 
         <div className="board-toolbar">
           <div className="board-view"><span className="board-view-icon" aria-hidden="true"><i /><i /><i /></span>Board view<span className="total-count" aria-label={`${totalCards} cards on this board`}>{totalCards}</span></div>
-          <p>Drag to move. Edit to add the details.</p>
+          <button type="button" className="assistant-launcher" aria-haspopup="dialog" aria-expanded={assistantOpen} aria-controls="assistant-dialog" onClick={() => setAssistantOpen(true)} disabled={!!editor}>
+            <span aria-hidden="true">+</span>{chatting ? "Assistant working..." : "Board assistant"}
+          </button>
         </div>
 
         <div className="board-scroll" role="region" aria-label="Kanban columns" tabIndex={0}>
@@ -129,7 +132,7 @@ export function KanbanBoard({ username, onSignOut, signingOut = false, onSession
         </div>
         <footer className="board-note"><span className="note-dot" aria-hidden="true" /><p role="status">{chatting ? "AI request in progress..." : saving ? "Saving changes..." : loading ? "Loading your board..." : error ? "Some changes were not saved." : "Your board is saved."}</p></footer>
       </div>
-      <ChatSidebar pending={chatting} disabled={saving || loading || blocked || signingOut || !!editor} onSend={chat} />
+      <ChatSidebar open={assistantOpen} onClose={() => setAssistantOpen(false)} pending={chatting} disabled={saving || loading || blocked || signingOut || !!editor} onSend={chat} />
       </div>
       <p aria-live="polite" className="sr-only">{announcement}</p>
       {editor && <CardEditor card={editor.card} columnId={editor.columnId} columns={columns} pending={busy} error={error} onSave={saveCard} onClose={() => setEditor(null)} />}

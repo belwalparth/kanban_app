@@ -1,4 +1,11 @@
-export type User = { username: string };
+export type User = { username: string; id?: number };
+export type AuthConfig = { google: boolean; demo: boolean };
+
+export async function getAuthConfig(): Promise<AuthConfig> {
+  const response = await fetch("/api/auth/config", { credentials: "same-origin", cache: "no-store" });
+  if (!response.ok) throw new Error("Couldn't load sign-in options.");
+  return response.json();
+}
 
 export async function getSession(): Promise<User | null> {
   const response = await fetch("/api/auth/session", { credentials: "same-origin", cache: "no-store" });

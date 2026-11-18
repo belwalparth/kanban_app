@@ -1,4 +1,6 @@
+import hashlib
 import sqlite3
+import time
 from contextlib import contextmanager
 from pathlib import Path
 
@@ -76,25 +78,28 @@ def migrate(target: Database) -> None:
             db.execute("SELECT pg_advisory_xact_lock(72412001)")
         db.execute("CREATE TABLE IF NOT EXISTS schema_migrations (version INTEGER PRIMARY KEY)")
         versions = [row["version"] for row in db.execute("SELECT version FROM schema_migrations").fetchall()]
-        if any(version != 1 for version in versions):
+        if any(version not in (1, 2) for version in versions):
             raise RuntimeError("Unsupported database schema version")
-        if 1 not in versions:
+        for version in (1, 2):
+            if version in versions:
+                continue
             engine = "postgres" if is_postgres(target) else "sqlite"
-            sql = Path(__file__).with_name("migrations").joinpath(f"001_{engine}.sql").read_text()
+            sql = Path(__file__).with_name("migrations").joinpath(f"{version:03}_{engine}.sql").read_text()
             for statement in sql.split(";"):
                 if statement.strip():
                     db.execute(statement)
-            db.execute("INSERT INTO schema_migrations (version) VALUES (1)")
+            db.execute("INSERT INTO schema_migrations (version) VALUES (?)", (version,))
         db.execute("SELECT id, username FROM users LIMIT 0")
         db.execute("SELECT user_id, board_json, revision FROM boards LIMIT 0")
         db.execute("SELECT issuer, subject, user_id, email, display_name FROM google_identities LIMIT 0")
+        db.execute("SELECT state_hash, browser_binding_hash, nonce, code_verifier, expires_at FROM oauth_login_states LIMIT 0")
         db.commit()
 
 
 def check_schema(target: Database) -> None:
     with connection(target) as db:
         versions = [row["version"] for row in db.execute("SELECT version FROM schema_migrations").fetchall()]
-        if versions != [1]:
+        if sorted(versions) != [1, 2]:
             raise RuntimeError("Run the database migration command before starting the app")
 
 
@@ -109,6 +114,14 @@ def initialize(path: Database, *, demo: bool = True) -> None:
                     raise RuntimeError("Legacy backup already exists; migrate explicitly with a new backup path")
                 with sqlite3.connect(backup) as destination:
                     db.backup(destination)
+            elif versioned:
+                versions = [row["version"] for row in db.execute("SELECT version FROM schema_migrations").fetchall()]
+                if versions == [1]:
+                    backup = Path(str(path) + ".pre-oauth.db")
+                    if backup.exists():
+                        raise RuntimeError("OAuth upgrade backup already exists; migrate explicitly with a new backup path")
+                    with sqlite3.connect(backup) as destination:
+                        db.backup(destination)
     migrate(path)
     if not demo:
         return
@@ -136,6 +149,38 @@ def find_user_by_id(path: Database, user_id: int) -> User | None:
     with connection(path) as db:
         row = db.execute("SELECT id, username FROM users WHERE id = ?", (user_id,)).fetchone()
     return User(id=row["id"], username=row["username"]) if row else None
+
+
+def user_display_name(path: Database, user: User) -> str:
+    with connection(path) as db:
+        profile = db.execute("SELECT email, display_name FROM google_identities WHERE user_id = ?", (user.id,)).fetchone()
+    return (profile["display_name"] or profile["email"] or "Google user") if profile else user.username
+
+
+def hash_login_value(value: str) -> str:
+    return hashlib.sha256(value.encode()).hexdigest()
+
+
+def save_login_attempt(path: Database, state: str, binding: str, nonce: str, verifier: str) -> None:
+    now = int(time.time())
+    with connection(path) as db:
+        begin_write(db, path)
+        db.execute("DELETE FROM oauth_login_states WHERE expires_at <= ?", (now,))
+        db.execute("""INSERT INTO oauth_login_states
+            (state_hash, browser_binding_hash, nonce, code_verifier, expires_at) VALUES (?, ?, ?, ?, ?)""",
+                   (hash_login_value(state), hash_login_value(binding), nonce, verifier, now + 600))
+        db.commit()
+
+
+def consume_login_attempt(path: Database, state: str, binding: str):
+    with connection(path) as db:
+        begin_write(db, path)
+        attempt = db.execute("""DELETE FROM oauth_login_states
+            WHERE state_hash = ? AND browser_binding_hash = ? AND expires_at > ?
+            RETURNING nonce, code_verifier""",
+                             (hash_login_value(state), hash_login_value(binding), int(time.time()))).fetchone()
+        db.commit()
+    return dict(attempt) if attempt else None
 
 
 def provision_google_user(path: Database, *, issuer: str, subject: str,
