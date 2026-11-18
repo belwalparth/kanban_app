@@ -69,6 +69,8 @@ export function useBoard(onSessionExpired?: () => void) {
           setError("This board changed elsewhere. Couldn't load the latest version. Reload the board before editing.");
         }
         return "conflict";
+      } else if (failure instanceof BoardApiError && [413, 422].includes(failure.status)) {
+        setError("The board couldn't be accepted. Check your changes and shorten large card text before saving again.");
       } else setError("Couldn't save your changes. Please try again.");
       return "failed";
     } finally {
@@ -110,13 +112,14 @@ export function useBoard(onSessionExpired?: () => void) {
           return { error: "This board changed elsewhere. Reload the board before sending again." };
         }
       }
-      if (![422, 502, 503, 504].includes(status)) {
+      if (![413, 422, 502, 503, 504].includes(status)) {
         setBlocked(true);
         setError("Couldn't confirm the AI result. Reload the board and review it before sending again.");
       }
       return { error: status === 502 ? "The AI returned an unusable response. You can try again."
         : status === 503 ? "AI is unavailable or busy. Please try again later."
         : status === 504 ? "The AI took too long to respond. You can try again."
+        : status === 413 ? "This request is too large. Shorten your message and try again."
         : status === 422 ? "The message couldn't be accepted. Edit it and try again."
         : "Couldn't confirm the result. Reload the board and review it before sending again." };
     } finally {

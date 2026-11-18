@@ -251,7 +251,7 @@ Tests:
 - [x] Verify cookie attributes, expiration, tampering rejection, logout, CSRF rejection, and disabled demo login in production configuration.
 - [x] Verify two signed-in users cannot read, manually edit, or AI-edit each other's boards; unauthenticated board/chat calls return 401.
 - [x] Component/browser tests cover sign-in navigation, callback errors, session restoration, logout, expiration, and private-state clearing. Routine checks use mocked identity flows.
-- [ ] Perform real Google sign-in separately with a test account after configuring Google client settings and a stable session secret.
+- [x] Perform real Google sign-in separately with a test account after configuring Google client settings and a stable session secret. User completed consent; the local database confirms one verified Google identity with one valid, persistent private board.
 
 Success: verified Google users can sign in, resume their own board, and sign out securely; production never grants access through the shared MVP password.
 
@@ -261,25 +261,31 @@ Additional UI request:
 - [x] Fit all five columns in a desktop row; wrap columns on smaller screens without horizontal scrolling.
 - [x] Verify popup lifecycle, pending requests, persistence, Google sign-in navigation/errors, account-state clearing, and desktop/mobile layout in component/browser tests.
 
-Implementation completed 2026-11-18. See `docs/PART13_VALIDATION.md` and `docs/GOOGLE_SIGN_IN.md`. Real Google sign-in remains pending because Google credentials/session configuration are absent locally; no cloud deployment or account registration was performed.
+Completed 2026-11-18. See `docs/PART13_VALIDATION.md` and `docs/GOOGLE_SIGN_IN.md`. Follow-up configuration enabled Google sign-in and disabled demo login; the user completed real Google consent, and the verified identity/private board were confirmed in the local database. Hosted deployment and the full two-account production smoke test remain Parts 14-15.
 
 ## Part 14: Vercel configuration and preview deployment
 
-- [ ] Add the verified Vercel build/entrypoint/routing configuration for frontend and FastAPI. Adjust Python/dependency configuration to supported runtimes and verify the backend's `uv` dependency installation path.
-- [ ] Configure database connections and app initialization for short-lived/concurrent function instances. No production database file, identity, or session state may depend on an instance's memory or filesystem.
-- [ ] Configure server-side OpenRouter timeout and function duration so AI requests fit platform limits and failures leave the board unchanged. Return useful errors without silently replaying writes.
-- [ ] Prepare separate preview and production secrets/databases, Google callback registrations, and stable `APP_BASE_URL` values. Keep preview traffic isolated from production boards.
-- [ ] Document a minimal deployment procedure, schema migration step, Google setup, environment variables, and rollback procedure in `docs/`; keep README concise.
-- [ ] Run all local checks and prepare a reviewable deployment configuration. When account access/settings are available, deploy a preview and configure its stable callback URL.
+- [x] Add the verified Vercel build/entrypoint/routing configuration for frontend and FastAPI. Retain supported Python 3.14, Node 24, and locked uv dependency installation; exercise the deployment build hook locally.
+- [x] Configure database connections and app initialization for short-lived/concurrent function instances. Cloud startup requires migrated PostgreSQL and explicit cloud settings; no production database file, identity, or session state depends on instance memory/filesystem.
+- [x] Bound the complete OpenRouter network operation to 40 seconds inside a 60-second function. Keep 5-second database connection/statement limits, atomic writes, safe errors, and no silent retries. Bound request/board/error response sizes below platform limits.
+- [x] Prepare ignored preview/production staging settings with separate session secrets, disabled demo login, and explicit empty account-specific values.
+- [ ] Provision separate preview/production databases, cloud Google clients/callback registrations, stable HTTPS hostnames, and environment values after Vercel/Neon access is connected.
+- [x] Document deployment procedure, schema migration, Google setup, environment settings, and rollback in `docs/VERCEL_DEPLOYMENT.md`; retain concise README guidance.
+- [x] Run local backend/frontend checks and prepare reviewable deployment configuration.
+- [ ] Deploy the configured preview and register its stable callback URL when account access/settings are available.
 
 Tests:
 
-- [ ] Run backend/frontend suites, lint, TypeScript checks, and production builds; retain local Docker sign-in/board/chat regression coverage.
-- [ ] Verify preview `/`, static assets, `/api/health`, auth/callback routes, and missing-resource behavior over HTTPS.
-- [ ] Verify session continuity across function instances, cookie forwarding, no caching of private responses, and durable board writes with PostgreSQL.
-- [ ] Run a separate preview AI smoke test and confirm provider failures/timeouts and revision conflicts preserve saved state.
+- [x] Run backend/frontend suites, lint, TypeScript, production builds, and local Docker sign-in/board/chat regressions.
+- [x] Verify sessions, secure cookie issuance, no-store responses, durable PostgreSQL writes, and new app instances using local HTTPS ASGI simulation and disposable storage.
+- [x] Verify total provider timeouts and revision conflicts preserve saved data; perform a separate live free-model answer/update check on synthetic local data.
+- [ ] Verify actual preview `/`, static assets, `/api/health`, auth/callback routes, and missing-resource behavior over hosted HTTPS.
+- [ ] Verify cookie/session continuity, no caching of private responses, durable PostgreSQL writes, and deployment lifecycle on Vercel.
+- [ ] Run a separate hosted preview AI smoke test and verify provider errors/timeouts and revision conflicts there.
 
 Success: a working HTTPS preview supports Google authentication and persistent manual/AI board updates using external storage and server-only secrets.
+
+Local implementation and validation prepared 2026-11-18. See `docs/PART14_VALIDATION.md` and `docs/VERCEL_DEPLOYMENT.md`. Actual cloud resource setup, preview deployment, and hosted acceptance checks remain pending because Vercel and Neon integrations are not connected. Local success is not a hosted deployment result.
 
 ## Part 15: Production release and verification
 

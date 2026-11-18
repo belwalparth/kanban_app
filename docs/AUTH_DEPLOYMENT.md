@@ -4,6 +4,8 @@ Part 11 decision record, 2026-11-18. This describes implementation in Parts 12-1
 
 Parts 12-13 now implement the storage/authentication design locally. See [Google sign-in](GOOGLE_SIGN_IN.md) for the resolved Authlib 1.9.9/HTTPX2 integration, setup, state handling, and actual runtime behavior. Hosting/deployment remains Parts 14-15; the sections below retain the architecture decision record.
 
+Part 14 adds checked-in Vercel entrypoint/build/routing configuration and bounded runtime requests. See [deployment procedure](VERCEL_DEPLOYMENT.md) and [Part 14 validation](PART14_VALIDATION.md); actual hosted preview deployment remains pending account access.
+
 ## Hosting decision
 
 Use one Vercel project with the FastAPI framework preset and `backend/` as its Root Directory. Enable **Include source files outside of the Root Directory in the Build Step** so the build can access `../frontend/`. Keep the current statically exported Next.js UI; it needs no Next.js server or separate frontend deployment.

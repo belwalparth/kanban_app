@@ -7,6 +7,7 @@ from pathlib import Path
 
 import psycopg
 from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import JSONResponse
 from starlette.concurrency import run_in_threadpool
@@ -20,6 +21,7 @@ from app.config import auth_settings
 from app.google_auth import create_google_client, router as google_router
 
 STATIC_DIR = Path(__file__).parent / "static"
+MAX_REQUEST_BYTES = 2_000_000
 
 
 def create_app(
@@ -29,6 +31,8 @@ def create_app(
     environment = os.environ.get("APP_ENV", "local")
     if environment not in ("local", "preview", "production"):
         raise RuntimeError("APP_ENV must be local, preview, or production")
+    if os.environ.get("VERCEL") == "1" and environment == "local":
+        raise RuntimeError("Vercel requires explicit preview or production APP_ENV")
     demo = allow_demo_login if allow_demo_login is not None else os.environ.get("ALLOW_DEMO_LOGIN", "false").lower() == "true"
     url = database_url or os.environ.get("DATABASE_URL")
     if url and not is_postgres(url):
@@ -69,6 +73,11 @@ def create_app(
         if request.method not in ("GET", "HEAD", "OPTIONS") and request.headers.get("origin") != settings.base_url:
             return JSONResponse(status_code=403, content={"detail": "Request origin is not allowed"},
                                 headers={"Cache-Control": "no-store"})
+        if request.method not in ("GET", "HEAD", "OPTIONS"):
+            length = request.headers.get("content-length", "")
+            if (length.isdecimal() and int(length) > MAX_REQUEST_BYTES) or len(await request.body()) > MAX_REQUEST_BYTES:
+                return JSONResponse(status_code=413, content={"detail": "Request exceeds the 2 MB size limit"},
+                                    headers={"Cache-Control": "no-store"})
         response = await call_next(request)
         response.headers["Cache-Control"] = "no-store"
         return response
@@ -77,6 +86,13 @@ def create_app(
     api.include_router(google_router)
     api.include_router(board_router)
     api.include_router(chat_router)
+
+    @api.exception_handler(RequestValidationError)
+    async def invalid_request(request: Request, error: RequestValidationError):
+        # Do not echo submitted passwords/board text or unbounded validation errors.
+        details = [{"loc": item["loc"], "msg": item["msg"], "type": item["type"]}
+                   for item in error.errors()[:20]]
+        return JSONResponse(status_code=422, content={"detail": details})
 
     @api.exception_handler(sqlite3.Error)
     async def database_error(request: Request, error: sqlite3.Error):

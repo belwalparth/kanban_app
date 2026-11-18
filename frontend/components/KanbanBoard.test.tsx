@@ -228,3 +228,14 @@ describe("Kanban board interactions", () => {
     await waitFor(() => expect(expired).toHaveBeenCalledTimes(2));
   });
 });
+
+it.each([413, 422])("retains failed edits and explains rejected large board saves after HTTP %s", async (status) => {
+  await showBoard();
+  vi.mocked(saveBoard).mockRejectedValueOnce(new BoardApiError(status));
+  fireEvent.click(screen.getByRole("button", { name: "Edit Draft onboarding" }));
+  fireEvent.change(screen.getByLabelText("Details"), { target: { value: "Keep this draft for correction" } });
+  fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+  expect(await screen.findByRole("alert")).toHaveTextContent("shorten large card text");
+  expect(screen.getByLabelText("Details")).toHaveValue("Keep this draft for correction");
+  expect(screen.getByRole("button", { name: "Save changes" })).toBeEnabled();
+});

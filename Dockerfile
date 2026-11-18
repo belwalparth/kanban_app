@@ -26,6 +26,20 @@ COPY backend/tests ./tests
 COPY --from=frontend-build /frontend/out ./app/static
 CMD ["uv", "run", "--locked", "pytest", "-q"]
 
+# Exercise the Vercel hook with Node 24 and Python 3.14 in one Linux environment.
+FROM base AS vercel-test
+COPY --from=frontend-deps /usr/local/bin/node /usr/local/bin/node
+COPY --from=frontend-deps /usr/local/lib/node_modules/ /usr/local/lib/node_modules/
+COPY --from=frontend-deps /root/.npm/ /root/.npm/
+RUN ln -s /usr/local/lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm
+WORKDIR /workspace/backend
+COPY backend/pyproject.toml backend/uv.lock ./
+RUN uv sync --locked
+COPY backend/ ./
+COPY frontend/ ../frontend/
+RUN npm_config_offline=true uv run --locked python build_frontend.py
+CMD ["uv", "run", "--locked", "pytest", "-q"]
+
 FROM base AS runtime
 RUN uv sync --locked --no-dev \
     && useradd --create-home appuser \

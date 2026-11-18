@@ -49,4 +49,15 @@ Google Cloud client registration/consent and the real browser sign-in have not b
 
 No hosted deployment, external account changes, or real data import occurred. Verify Vercel routing, function behavior/redeployment, and hosting-platform access-log redaction during deployment. Application logging filters do not control external platform request logs. Native macOS/Linux script checks were not rerun; scripts were unchanged.
 
-Historical validation documents remain unchanged. [PLAN.md](PLAN.md) marks implementation and automated checks complete while leaving the real Google test pending.
+Historical validation documents remain unchanged. The results above describe the initial implementation checks; the follow-up below records subsequent real-account configuration and validation.
+
+## Follow-up: real Google sign-in
+
+The local `.env` now contains a generated persistent session secret, the localhost base URL, and Google credentials supplied by the user. Demo login was disabled, and the container was recreated successfully. Secret values were never printed or committed.
+
+- The live start endpoint returned 302 to `accounts.google.com`, using exactly `http://localhost:8000/api/auth/google/callback`, scopes `openid email profile`, and S256 PKCE. The auth redirect was no-store, and demo login returned 403.
+- A Chrome check confirmed **Continue with Google** is visible, targets the backend start route, and the password form is absent.
+- After the user completed Google consent, the local database contained exactly one verified Google identity and exactly one Google-owned board. That board passed the normal board model validation and remained identical across separate database connections. Board content, subject, email, and profile values were not printed.
+- The health endpoint remained healthy with Google enabled and demo login disabled. [PLAN.md](PLAN.md) now records the single-account real sign-in check as complete.
+
+The complete two-account browser workflow, hosted sign-in, logout/reload checks with real accounts, and redeployment verification remain Parts 14-15; this follow-up does not claim those checks were performed.

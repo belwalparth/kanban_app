@@ -1,3 +1,4 @@
+import asyncio
 import os
 
 import httpx2 as httpx
@@ -5,6 +6,7 @@ import httpx2 as httpx
 DEFAULT_MODEL = "nvidia/nemotron-3.5-super-vl:free"
 API_URL = "https://openrouter.ai/api/v1/chat/completions"
 TIMEOUT_SECONDS = 30.0
+TOTAL_TIMEOUT_SECONDS = 40.0
 
 
 class OpenRouterError(Exception):
@@ -33,9 +35,10 @@ class OpenRouterClient:
         if response_format is not None:
             payload["response_format"] = response_format
         try:
-            async with httpx.AsyncClient(timeout=TIMEOUT_SECONDS, transport=self.transport) as client:
-                response = await client.post(API_URL, headers={"Authorization": f"Bearer {self.api_key}"}, json=payload)
-        except httpx.TimeoutException:
+            async with asyncio.timeout(TOTAL_TIMEOUT_SECONDS):
+                async with httpx.AsyncClient(timeout=TIMEOUT_SECONDS, transport=self.transport) as client:
+                    response = await client.post(API_URL, headers={"Authorization": f"Bearer {self.api_key}"}, json=payload)
+        except (TimeoutError, httpx.TimeoutException):
             raise OpenRouterError("OpenRouter request timed out. Please try again later.", 504) from None
         except httpx.RequestError:
             raise OpenRouterError("Couldn't connect to OpenRouter. Please try again later.") from None

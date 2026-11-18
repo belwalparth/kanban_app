@@ -136,3 +136,25 @@ def test_live_check_validation_is_tested_offline(monkeypatch, capsys, answer, su
     else:
         with pytest.raises(OpenRouterError):
             asyncio.run(check())
+
+
+def test_total_deadline_bounds_a_slow_response_and_closes_transport(monkeypatch):
+    from app import openrouter
+    monkeypatch.setattr(openrouter, "TOTAL_TIMEOUT_SECONDS", 0.025)
+    calls = []
+    closed = []
+    class SlowBody(httpx.AsyncByteStream):
+        async def __aiter__(self):
+            for _ in range(100):
+                await asyncio.sleep(0.01)
+                yield b" "
+        async def aclose(self):
+            closed.append(True)
+    def provider(request):
+        calls.append(request)
+        return httpx.Response(200, stream=SlowBody())
+    with pytest.raises(OpenRouterError, match="timed out") as caught:
+        complete(provider)
+    assert caught.value.status_code == 504
+    assert len(calls) == 1
+    assert closed

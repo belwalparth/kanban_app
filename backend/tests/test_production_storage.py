@@ -9,7 +9,7 @@ from threading import Barrier
 
 import psycopg
 import pytest
-from fastapi import HTTPException
+from fastapi import HTTPException, Request
 from fastapi.testclient import TestClient
 from itsdangerous import TimestampSigner
 
@@ -309,3 +309,46 @@ def test_version_one_sqlite_upgrade_backs_up_board_and_preserves_revision(tmp_pa
     initialize(target, demo=False)
     with connection(target) as db:
         assert dict(db.execute("SELECT board_json, revision FROM boards").fetchone()) == before
+
+
+def test_https_preview_sessions_and_writes_survive_new_instances(store, tmp_path, monkeypatch):
+    if not is_postgres(store):
+        pytest.skip("Cloud runtime requires PostgreSQL")
+    monkeypatch.setenv("APP_ENV", "preview")
+    monkeypatch.setenv("VERCEL", "1")
+    monkeypatch.setenv("APP_BASE_URL", "https://preview.example")
+    monkeypatch.setenv("GOOGLE_CLIENT_ID", "preview-client")
+    monkeypatch.setenv("GOOGLE_CLIENT_SECRET", "preview-secret")
+    secret = "preview-session-secret-32-characters"
+    user = google(store)
+    payload = {"user_id": user.id, "expires_at": int(time.time()) + 3600}
+    (tmp_path / "index.html").write_text("Preview frontend", encoding="utf-8")
+    options = {"database_url": store, "session_secret": secret, "allow_demo_login": False}
+    preview_app = create_app(tmp_path, **options)
+    api = next(route.app for route in preview_app.routes if route.path == "/api")
+    @api.get("/test-session")
+    def issue_session(request: Request):
+        request.session.update(payload)
+        return {}
+    with TestClient(preview_app, base_url="https://preview.example", headers={"Origin": "https://preview.example"}) as first:
+        created = first.get("/api/test-session")
+        signed_cookie = first.cookies.get(SESSION_COOKIE)
+        response = first.get("/api/auth/session")
+        assert response.status_code == 200
+        assert response.json()["id"] == user.id
+        session_header = created.headers["set-cookie"].lower()
+        assert "secure" in session_header and "httponly" in session_header and "samesite=lax" in session_header
+        saved = first.get("/api/board").json()
+        saved["board"]["columns"][0]["title"] = "Durable preview changes"
+        saved = first.put("/api/board", json=saved).json()
+        assert saved["revision"] == 1
+    with TestClient(create_app(tmp_path, **options), base_url="https://preview.example", headers={"Origin": "https://preview.example"}) as second:
+        second.cookies.set(SESSION_COOKIE, signed_cookie, domain="preview.example", path="/")
+        response = second.get("/api/board")
+        assert response.json() == saved and response.headers["cache-control"] == "no-store"
+        assert second.get("/").text == "Preview frontend"
+        assert second.get("/api/missing").status_code == 404
+        assert second.get("/missing.js").status_code == 404
+        callback = second.get("/api/auth/google/callback", follow_redirects=False)
+        assert callback.status_code == 303 and callback.headers["cache-control"] == "no-store"
+    assert read_board(user, store).revision == 1

@@ -4,6 +4,8 @@ A local project management MVP. Sign in with `user` / `password` to manage cards
 
 Google sign-in is available when configured; see [Google setup](docs/GOOGLE_SIGN_IN.md) and [database migrations](docs/DATABASE_OPERATIONS.md). Compose enables local demo login by default; set `ALLOW_DEMO_LOGIN=false` when using Google. Demo login is disabled in preview/production.
 
+Vercel preview setup and rollback steps are in [deployment instructions](docs/VERCEL_DEPLOYMENT.md). Cloud hosting uses PostgreSQL; local SQLite data stays in Docker.
+
 ## Getting started
 
 Requires Docker with Compose (Docker Desktop on Windows/macOS), running Linux containers.

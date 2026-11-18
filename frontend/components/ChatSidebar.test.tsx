@@ -75,7 +75,7 @@ it("prevents duplicate submissions and manual edits during AI requests, then res
   expect(screen.getByLabelText("Message the assistant")).toHaveFocus();
 });
 
-it.each([502, 503, 504, 422])("retains a failed draft for explicit retry after HTTP %s", async (status) => {
+it.each([413, 502, 503, 504, 422])("retains a failed draft for explicit retry after HTTP %s", async (status) => {
   vi.mocked(sendChat).mockRejectedValueOnce(new BoardApiError(status));
   await show();
   submit("Keep this request");

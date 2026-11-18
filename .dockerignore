@@ -1,6 +1,7 @@
 **/.env
 **/.env.*
 **/.git
+**/.vercel
 **/.venv
 **/__pycache__
 **/.pytest_cache

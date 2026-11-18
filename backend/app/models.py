@@ -4,6 +4,7 @@ from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_vali
 
 ColumnId = Literal["backlog", "todo", "in-progress", "review", "done"]
 COLUMN_IDS = get_args(ColumnId)
+MAX_BOARD_BYTES = 1_000_000
 Title = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
 Identifier = Annotated[str, StringConstraints(min_length=1, pattern=r"\S")]
 
@@ -39,6 +40,8 @@ class Board(StrictModel):
         card_ids = [card.id for column in self.columns for card in column.cards]
         if len(card_ids) != len(set(card_ids)):
             raise ValueError("Card IDs must be unique across the board")
+        if len(self.model_dump_json().encode("utf-8")) > MAX_BOARD_BYTES:
+            raise ValueError("Board exceeds the 1 MB size limit; shorten card text or remove cards")
         return self
 
 

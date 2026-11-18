@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { getAuthConfig, getSession, signIn, signOut } from "@/lib/auth";
@@ -168,7 +168,7 @@ it("explains cancelled Google sign-in and removes the callback error from the UR
   vi.mocked(getAuthConfig).mockResolvedValue({ google: true, demo: false });
   render(<AuthGate />);
   expect(await screen.findByRole("alert")).toHaveTextContent("Google sign-in was cancelled");
-  expect(window.location.search).toBe("");
+  await waitFor(() => expect(window.location.search).toBe(""));
   expect(screen.getByRole("link", { name: "Continue with Google" })).toBeInTheDocument();
 });
 
