@@ -5,7 +5,7 @@ import { KanbanBoard } from "./KanbanBoard";
 import { BoardApiError, loadBoard, saveBoard } from "@/lib/board-api";
 import { resetBoardServer, stored } from "@/test/board-server";
 
-vi.mock("@/lib/board-api", async (original) => ({ ...await original<typeof import("@/lib/board-api")>(), loadBoard: vi.fn(), saveBoard: vi.fn() }));
+vi.mock("@/lib/board-api", async (original) => ({ ...await original<typeof import("@/lib/board-api")>(), listBoards: vi.fn(), createBoard: vi.fn(), renameBoard: vi.fn(), loadBoard: vi.fn(), saveBoard: vi.fn() }));
 beforeEach(() => { vi.resetAllMocks(); resetBoardServer(); });
 
 async function showBoard() {

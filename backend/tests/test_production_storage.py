@@ -1,6 +1,5 @@
 """Shared integration contract. PostgreSQL URL MUST name a disposable test database."""
 import json
-import os
 import sqlite3
 import time
 from base64 import b64encode
@@ -14,28 +13,12 @@ from fastapi.testclient import TestClient
 from itsdangerous import TimestampSigner
 
 from app.auth import SESSION_COOKIE
-from app.boards import read_board, update_board
+from app.boards import read_board, resolve_board_id, update_board
 from app.database import (GOOGLE_ISSUER, board_value, check_schema, connection,
                           initialize, is_postgres, migrate, provision_google_user)
 from app.main import create_app
 from app.manage_db import import_demo
 from app.models import BoardState
-
-
-@pytest.fixture(params=["sqlite", "postgres"])
-def store(request, tmp_path):
-    if request.param == "sqlite":
-        target = tmp_path / "identities.db"
-    else:
-        target = os.environ.get("TEST_DATABASE_URL")
-        if not target:
-            pytest.skip("TEST_DATABASE_URL is required for PostgreSQL integration")
-        # Never reuse the app DATABASE_URL. This database is explicitly disposable.
-        with psycopg.connect(target, autocommit=True) as db:
-            db.execute("DROP SCHEMA public CASCADE")
-            db.execute("CREATE SCHEMA public")
-    migrate(target)
-    return target
 
 
 def google(store, subject="one", **profile):
@@ -52,7 +35,7 @@ def test_migration_repeatable_without_demo_seed(store):
     check_schema(store)
     assert count(store, "users") == count(store, "boards") == 0
     with connection(store) as db:
-        assert sorted(row["version"] for row in db.execute("SELECT version FROM schema_migrations").fetchall()) == [1, 2]
+        assert sorted(row["version"] for row in db.execute("SELECT version FROM schema_migrations").fetchall()) == [1, 2, 3]
 
 
 def test_identity_profile_and_email_are_not_ownership(store):
@@ -104,7 +87,7 @@ def test_invalid_identity_cannot_write(store, issuer, subject):
 def test_unique_identity_board_and_foreign_keys(store):
     user = google(store)
     statements = [
-        ("INSERT INTO boards (user_id, board_json) VALUES (?, ?)", (user.id, board_value(read_board(user, store).board, store))),
+        ("INSERT INTO boards (user_id, board_json) VALUES (?, ?)", (99999, board_value(read_board(user, store).board, store))),
         ("INSERT INTO google_identities (issuer, subject, user_id) VALUES (?, ?, ?)", (GOOGLE_ISSUER, "two", user.id)),
         ("INSERT INTO google_identities (issuer, subject, user_id) VALUES (?, ?, ?)", (GOOGLE_ISSUER, "two", 99999)),
     ]
@@ -172,19 +155,22 @@ def test_explicit_demo_import_keeps_source_and_revision(store, tmp_path):
     with connection(source) as db:
         db.execute("UPDATE boards SET revision = 17")
     user = google(store)
+    with connection(source) as db:
+        source_id = db.execute("SELECT id FROM boards").fetchone()["id"]
+    selected = {"source_board_id": source_id, "board_id": resolve_board_id(user, store)}
     with pytest.raises(ValueError, match="already has a board"):
-        import_demo(source, tmp_path / "backup1.db", store, "one")
+        import_demo(source, tmp_path / "backup1.db", store, "one", **selected)
     assert read_board(user, store).revision == 0
-    import_demo(source, tmp_path / "backup2.db", store, "one", replace=True)
+    import_demo(source, tmp_path / "backup2.db", store, "one", replace=True, **selected)
     assert read_board(user, store).revision == 17
     assert read_board(user, store).board.model_dump() == original
     with connection(source) as db:
         assert db.execute("SELECT revision FROM boards").fetchone()["revision"] == 17
     with pytest.raises(ValueError, match="already verified"):
-        import_demo(source, tmp_path / "backup3.db", store, "absent", replace=True)
+        import_demo(source, tmp_path / "backup3.db", store, "absent", replace=True, **selected)
     assert count(store, "users") == 1
     with pytest.raises(ValueError, match="Destination must differ"):
-        import_demo(source, tmp_path / "backup4.db", source, "one", replace=True)
+        import_demo(source, tmp_path / "backup4.db", source, "one", replace=True, **selected)
 
 
 def test_legacy_sqlite_migration_preserves_saved_data(tmp_path):
@@ -294,7 +280,7 @@ def test_version_one_sqlite_upgrade_backs_up_board_and_preserves_revision(tmp_pa
     initialize(target)
     with connection(target) as db:
         db.execute("DROP TABLE oauth_login_states")
-        db.execute("DELETE FROM schema_migrations WHERE version = 2")
+        db.execute("DELETE FROM schema_migrations WHERE version >= 2")
         db.execute("UPDATE boards SET revision = 23")
         before = dict(db.execute("SELECT board_json, revision FROM boards").fetchone())
     initialize(target, demo=False)
@@ -305,7 +291,7 @@ def test_version_one_sqlite_upgrade_backs_up_board_and_preserves_revision(tmp_pa
         assert db.execute("SELECT name FROM sqlite_master WHERE name = 'oauth_login_states'").fetchone() is None
     with connection(target) as db:
         assert dict(db.execute("SELECT board_json, revision FROM boards").fetchone()) == before
-        assert sorted(row["version"] for row in db.execute("SELECT version FROM schema_migrations")) == [1, 2]
+        assert sorted(row["version"] for row in db.execute("SELECT version FROM schema_migrations")) == [1, 2, 3]
     initialize(target, demo=False)
     with connection(target) as db:
         assert dict(db.execute("SELECT board_json, revision FROM boards").fetchone()) == before

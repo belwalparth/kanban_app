@@ -1,6 +1,6 @@
 # Frontend instructions
 
-Read the root `Agents.md` and `docs/Plan.md` before changes. Follow the approved part of the plan. This describes the Part 10 frontend; update it as implementation changes.
+Read the root `Agents.md` and `docs/Plan.md` before changes. Follow the approved part of the plan. This describes the Part 17 frontend; update it as implementation changes.
 
 ## Existing code
 
@@ -10,21 +10,24 @@ Read the root `Agents.md` and `docs/Plan.md` before changes. Follow the approved
 - `components/AuthGate.tsx`: checks the server session on load/window focus, gates board rendering, and handles logout/retry. A version ref prevents older session responses from undoing login/logout. Unmounting the board clears its local state.
 - `components/SignIn.tsx`: labeled username/password form with pending/error states and demo credential guidance. The backend validates credentials.
 - `lib/auth.ts`: same-origin login/session/logout fetch calls; session cookies are HttpOnly and never stored in browser storage.
-- `lib/board-api.ts`: authenticated board reads/replacements using the backend revision envelope and typed HTTP status errors.
-- `lib/use-board.ts`: single canonical board/revision state owned by the board component. Loads server data and serializes manual saves and AI requests through one immediate in-flight guard. Applies canonical responses, reloads conflicts, blocks writes after uncertain network results until board reload, and reports session expiry. Do not introduce a second independent board state for chat.
-- `lib/chat-api.ts`: same-origin authenticated `/api/chat` calls with current revision and at most 20 previous conversation entries. No automatic retries.
-- `components/ChatSidebar.tsx`: responsive sidebar (below the board on narrow screens), bounded memory-only history, labeled draft, pending/error/retry states, plain-text replies, and keyboard focus restoration. Successful replies clear the draft; failures retain it. Unmounting on logout/expiry clears history and drafts; page reload also clears them.
-- `app/globals.css`: palette, system fonts without external requests, board/card/dialog styles, responsive horizontal scrolling, focus styling, and reduced-motion rules.
-- `components/KanbanBoard.tsx`: client component with board/drag/editor state, card CRUD, column rename, completion progress, live announcements, empty states, native HTML cross-column drag/drop, and signed-in username/logout controls.
+- `lib/board-api.ts`: authenticated list/create/rename and board-specific reads/replacements under `/api/boards`, with metadata types, revision envelopes, and typed HTTP status errors. Optional legacy helpers remain for compatibility checks.
+- `lib/use-board.ts`: single canonical board/revision state for the selected `BoardView`. Serializes manual/AI work, reports immediate operation locks and canonical revisions to the workspace, reloads conflicts, and ignores responses after that view unmounts. Do not introduce a second independent board state for chat.
+- `lib/chat-api.ts`: same-origin `/api/boards/{id}/chat` calls with current revision and at most 20 history entries. No automatic retries. `ChatMemory` holds only per-board in-session UI data.
+- `components/ChatSidebar.tsx`: on-demand native dialog with bounded history, draft/errors/notices, plain-text replies, and focus restoration. Memory is retained per board by the signed-in workspace; closing/reopening or switching back restores it. Logout, expiry, account change, and page reload clear it.
+- `app/globals.css`: palette, system fonts, compact board controls, five desktop columns with responsive wrapping, modal styles, visible focus, and reduced-motion rules.
+- `components/KanbanBoard.tsx`: workspace shell with owned-board metadata, compact selector, create/rename forms, `?board=<id>` history, and per-board chat memory. Immediate lock refs prevent switches during pending mutations/open edits; browser history navigation is queued until they finish or are cancelled. The keyed `BoardView` prevents obsolete responses from replacing another board.
+- `components/BoardView.tsx`: selected-board card/drag/editor state, CRUD, column rename, progress, announcements, and AI dialog. Remounts on selection or a board-name revision refresh; canonical content comes only from the selected board API.
 - `components/CardEditor.tsx`: native modal dialog with title/details/column fields, async save feedback, and retained drafts on failure. Pending saves disable inputs and dismissal. Conflicts close the obsolete draft after attempting a canonical reload.
-- `components/ColumnTitle.tsx`: local rename draft; Enter/blur commits, Escape cancels. Blank names restore the saved title; failed saves retain the draft with an error. Reload generation keys discard obsolete rename drafts after conflicts.
+- `components/ColumnTitle.tsx`: local rename draft; Enter/blur commits, Escape cancels. Reports dirty drafts to prevent accidental board switching; cleanup after canonical conflict reload clears obsolete draft locks.
 - `lib/board.ts`: `Card`/`Column` types, seeded data, ID generation, and immutable add/edit/delete/rename/move helpers.
 - `lib/board.test.ts` and `components/KanbanBoard.test.tsx`: helper and user interaction tests.
 - `vitest.config.ts` / `vitest.setup.ts`: jsdom, Testing Library, alias resolution, current Vite Oxc JSX transform, and a dialog lifecycle shim for jsdom. Browser focus behavior is covered by Playwright.
 - `components/AuthGate.test.tsx`: login, session restoration, pending/errors, logout cleanup, focus checks, and stale response regression coverage.
+- `components/BoardWorkspace.test.tsx`: creation/rename failures, selection/history, per-board AI memory, pending switch races, obsolete loads, and all-board memory cleanup on account changes.
 - `test/board-server.ts`: isolated mocked API state for component tests. Test data does not initialize the production board.
 - `e2e/fixtures.ts`: per-test shared mock board store for normal desktop/mobile checks; authentication uses the running backend. `e2e/board-errors.spec.ts` covers save failures, conflicts, retry, and expiry. `e2e/chat.spec.ts` covers mocked chat updates, history, pending/retry, conflicts/expiry, keyboard access, and layout. `e2e/live-chat.spec.ts` is an explicit live-provider check, gated by `KANBAN_LIVE_AI=1`, desktop project, and base URL `http://localhost:8001`; use a disposable database only.
 - `e2e/persistence.spec.ts`: a desktop check against the real board API. Uses a unique temporary card and cleans up only that card. Never reset the user's board to test defaults. Mobile skips this duplicate real-data check and native drag/drop; touch movement is tested through the editor.
+- `e2e/boards.spec.ts`: desktop/mobile board selection, create/rename, history/reload, AI memory, pending AI navigation, unavailable links, and keyboard/long-name layout. `e2e/boards-persistence.spec.ts` is gated by `KANBAN_DISPOSABLE_E2E=1`, desktop, and localhost:8002; it creates a board only in a disposable database.
 - `playwright.config.ts`: `PLAYWRIGHT_BASE_URL` overrides `http://localhost:8000`; `PLAYWRIGHT_CHANNEL=chrome` uses installed Chrome.
 - `next.config.mjs`: static export in production, strict mode, and development-only `/api/*` proxy to FastAPI on port 8000. Docker copies `out/` to FastAPI's static directory; no production Node server.
 - `eslint.config.mjs`: flat configuration with Next.js core-web-vitals and TypeScript rules.
@@ -34,7 +37,7 @@ Read the root `Agents.md` and `docs/Plan.md` before changes. Follow the approved
 
 Five fixed column IDs: `backlog`, `todo`, `in-progress`, `review`, `done`. Display titles are editable. Cards have `id`, `title`, and `details`. Moves append to the destination; same-column drops do nothing.
 
-Sign-in options come from `/api/auth/config`: Google when configured, and `user` / `password` only in explicit local demo mode. Sessions use an eight-hour backend-signed cookie and an internal user ID; profile names are display data. Board data loads through `/api/board` from SQLite or PostgreSQL and persists across reload/logout/restart. Logout/expired sessions and account changes unmount private UI; signing in loads the owned board. Chat uses `/api/chat` and applies the canonical board immediately. Manual edits, reload, and logout are disabled during AI requests; chat is disabled during manual saves or open card editors. Conflicts retain the chat draft for explicit resubmission after review, without replaying it.
+Sign-in options come from `/api/auth/config`: Google when configured, and `user` / `password` only in explicit local demo mode. Sessions use an eight-hour backend-signed cookie and an internal user ID. The workspace lists owned-board metadata, then loads only the selected board through `/api/boards/{id}`. Without a selection URL it opens the first board; invalid/foreign selections offer recovery without loading another board silently. Create selects the confirmed new board; rename uses the selected metadata revision. Board/AI saves apply canonical responses to that board only. Switches and management actions are locked during pending work or open drafts; browser Back/Forward waits instead of discarding edits. Logout/expiry/account changes unmount the workspace and all private board/chat state. No board JSON or chat history is stored in browser storage.
 
 `ChatSidebar.tsx` now renders an on-demand native modal dialog, launched by **Board assistant** above the columns. It stays mounted to retain drafts/history on close, restores launcher focus, and supports Escape. All five columns fit on desktop; smaller screens wrap columns without horizontal scrolling. Do not restore the permanent sidebar or a fixed minimum board width.
 
@@ -52,7 +55,7 @@ Run from `frontend/`:
 - `npm run lint`: ESLint CLI; Next.js no longer runs lint as part of its build.
 - `npm run test:e2e`: Playwright tests; requires a running app and installed Chromium/Chrome.
 
-Current validation and manual checks are in `docs/PART13_VALIDATION.md` and `docs/GOOGLE_SIGN_IN.md`; prior parts document earlier milestones.
+Current validation and manual checks are in `docs/PART17_VALIDATION.md` and `docs/GOOGLE_SIGN_IN.md`; prior parts document earlier milestones. The multi-board frontend requires the Part 16 backend/schema 3; hosted deployment remains Part 18.
 
 ## Change conventions
 

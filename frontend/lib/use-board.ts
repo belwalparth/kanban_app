@@ -5,7 +5,8 @@ import { BoardApiError, loadBoard, saveBoard, type BoardState } from "./board-ap
 import type { Column } from "./board";
 import { sendChat, type ChatMessage, type ChatResult } from "./chat-api";
 
-export function useBoard(onSessionExpired?: () => void) {
+export function useBoard(onSessionExpired: (() => void) | undefined, boardId: number,
+  onPendingChange: (pending: boolean) => void, onRevisionChange: (id: number, revision: number) => void) {
   const [state, setState] = useState<BoardState | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -23,16 +24,17 @@ export function useBoard(onSessionExpired?: () => void) {
   }, []);
   useEffect(() => {
     let active = true;
-    loadBoard().then((board) => {
-      if (active) { setState(board); setBlocked(false); setError(""); setGeneration((value) => value + 1); }
+    loadBoard(boardId).then((board) => {
+      if (active) { setState(board); onRevisionChange(boardId, board.revision); setBlocked(false); setError(""); setGeneration((value) => value + 1); }
     }).catch((failure) => {
       if (!active) return;
       if (failure instanceof BoardApiError && failure.status === 401) onSessionExpired?.();
       setError(failure instanceof BoardApiError && failure.status === 401
-        ? "Your session expired. Please sign in again." : "Couldn't load your board. Please try again.");
+        ? "Your session expired. Please sign in again." : failure instanceof BoardApiError && failure.status === 404
+          ? "This board is unavailable. Choose another board or reload the list." : "Couldn't load your board. Please try again.");
     }).finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, [attempt, onSessionExpired]);
+  }, [attempt, boardId, onSessionExpired, onRevisionChange]);
 
   function reload() {
     if (inFlight.current) return;
@@ -42,12 +44,14 @@ export function useBoard(onSessionExpired?: () => void) {
   async function save(columns: Column[]): Promise<"saved" | "failed" | "conflict"> {
     if (!state || inFlight.current || loading || blocked) return "failed";
     inFlight.current = true;
+    onPendingChange(true);
     setSaving(true);
     setError("");
     try {
-      const saved = await saveBoard({ revision: state.revision, board: { columns } });
+      const saved = await saveBoard({ revision: state.revision, board: { columns } }, boardId);
       if (!mounted.current) return "failed";
       setState(saved);
+      onRevisionChange(boardId, saved.revision);
       return "saved";
     } catch (failure) {
       if (!mounted.current) return "failed";
@@ -57,9 +61,10 @@ export function useBoard(onSessionExpired?: () => void) {
       } else if (failure instanceof BoardApiError && failure.status === 409) {
         setBlocked(true);
         try {
-          const latest = await loadBoard();
+          const latest = await loadBoard(boardId);
           if (!mounted.current) return "failed";
           setState(latest);
+          onRevisionChange(boardId, latest.revision);
           setGeneration((value) => value + 1);
           setBlocked(false);
           setError("This board changed elsewhere. The latest version is loaded; your edit was not saved.");
@@ -75,18 +80,20 @@ export function useBoard(onSessionExpired?: () => void) {
       return "failed";
     } finally {
       inFlight.current = false;
-      if (mounted.current) setSaving(false);
+      if (mounted.current) { setSaving(false); onPendingChange(false); }
     }
   }
   async function chat(message: string, history: ChatMessage[]): Promise<ChatResult> {
     if (!state || inFlight.current || loading || blocked) return { error: "Wait for the board to be ready before sending." };
     inFlight.current = true;
+    onPendingChange(true);
     setChatting(true);
     setError("");
     try {
-      const response = await sendChat(state.revision, message, history);
+      const response = await sendChat(state.revision, message, history, boardId);
       if (!mounted.current) return { error: "Your session has ended." };
       setState(response.state);
+      onRevisionChange(boardId, response.state.revision);
       setGeneration((value) => value + 1);
       return { response };
     } catch (failure) {
@@ -99,9 +106,10 @@ export function useBoard(onSessionExpired?: () => void) {
       if (status === 409) {
         setBlocked(true);
         try {
-          const latest = await loadBoard();
+          const latest = await loadBoard(boardId);
           if (!mounted.current) return { error: "Your session has ended." };
           setState(latest);
+          onRevisionChange(boardId, latest.revision);
           setGeneration((value) => value + 1);
           setBlocked(false);
           return { error: "This board changed elsewhere. The latest version is loaded. Review it before sending again." };
@@ -124,7 +132,7 @@ export function useBoard(onSessionExpired?: () => void) {
         : "Couldn't confirm the result. Reload the board and review it before sending again." };
     } finally {
       inFlight.current = false;
-      if (mounted.current) setChatting(false);
+      if (mounted.current) { setChatting(false); onPendingChange(false); }
     }
   }
   return { state, loading, saving, chatting, blocked, error, generation, save, reload, chat };

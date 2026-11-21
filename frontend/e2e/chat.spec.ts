@@ -8,7 +8,7 @@ test.beforeEach(async ({ page }) => {
 });
 
 test("AI multi-card changes appear immediately, survive reload, and keep manual saves working", async ({ page, boardStore }) => {
-  await page.route("**/api/chat", async (route) => {
+  await page.route("**/api/boards/1/chat", async (route) => {
     const body = route.request().postDataJSON();
     expect(body.revision).toBe(boardStore.state.revision);
     expect(body.history).toEqual([]);
@@ -49,7 +49,7 @@ test("AI multi-card changes appear immediately, survive reload, and keep manual 
 
 test("answer-only replies forward history, display plain text, and clear on logout", async ({ page, boardStore }) => {
   let calls = 0;
-  await page.route("**/api/chat", async (route) => {
+  await page.route("**/api/boards/1/chat", async (route) => {
     const body = route.request().postDataJSON();
     expect(body.history).toHaveLength(calls * 2);
     calls++;
@@ -74,7 +74,7 @@ test("pending requests block duplicate actions and provider failures retain the 
   let release!: () => void;
   const gate = new Promise<void>((resolve) => { release = resolve; });
   let calls = 0;
-  await page.route("**/api/chat", async (route) => {
+  await page.route("**/api/boards/1/chat", async (route) => {
     calls++;
     if (calls === 1) { await gate; await route.fulfill({ status: 503, json: { detail: "Unavailable" } }); }
     else await route.fulfill({ json: { reply: "Recovered", updated: false, state: boardStore.state } });
@@ -96,7 +96,7 @@ test("pending requests block duplicate actions and provider failures retain the 
 });
 
 test("conflicts reload canonical state and keep requests explicit; expiry clears chat", async ({ page, boardStore }) => {
-  await page.route("**/api/chat", async (route) => {
+  await page.route("**/api/boards/1/chat", async (route) => {
     boardStore.state.revision = 4;
     boardStore.state.board.columns[0].title = "Fresh backlog";
     await route.fulfill({ status: 409, json: { detail: "Conflict" } });
@@ -105,8 +105,8 @@ test("conflicts reload canonical state and keep requests explicit; expiry clears
   await page.getByRole("button", { name: "Send message" }).click();
   await expect(page.getByRole("dialog", { name: "Board assistant" }).getByRole("alert")).toContainText("latest version is loaded");
   await expect(page.getByLabel("Rename Fresh backlog")).toHaveValue("Fresh backlog");
-  await page.unroute("**/api/chat");
-  await page.route("**/api/chat", (route) => route.fulfill({ status: 401, json: { detail: "Expired" } }));
+  await page.unroute("**/api/boards/1/chat");
+  await page.route("**/api/boards/1/chat", (route) => route.fulfill({ status: 401, json: { detail: "Expired" } }));
   await page.getByRole("button", { name: "Send again" }).click();
   await expect(page.getByLabel("Username", { exact: true })).toBeVisible();
   await expect(page.getByRole("log")).toHaveCount(0);

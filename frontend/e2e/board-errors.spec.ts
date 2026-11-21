@@ -7,7 +7,7 @@ test.beforeEach(async ({ page }) => {
 
 test("a failed card save retains the draft and an explicit retry persists it", async ({ page }) => {
   let fail = true;
-  await page.route("**/api/board", async (route) => {
+  await page.route("**/api/boards/1", async (route) => {
     if (fail && route.request().method() === "PUT") await route.fulfill({ status: 503, json: { detail: "Unavailable" } });
     else await route.fallback();
   });
@@ -29,7 +29,7 @@ test("conflicts load the latest board without replaying a rejected edit", async 
   let writes = 0;
   const latest = { revision: 3, board: { columns: structuredClone(DEFAULT_COLUMNS) } };
   latest.board.columns[0].title = "Changed in another tab";
-  await page.route("**/api/board", async (route) => {
+  await page.route("**/api/boards/1", async (route) => {
     if (route.request().method() === "PUT") {
       writes += 1;
       conflict = true;
@@ -46,7 +46,7 @@ test("conflicts load the latest board without replaying a rejected edit", async 
 });
 
 test("an expired session during save removes the board and its draft", async ({ page, context }) => {
-  await page.route("**/api/board", async (route) => {
+  await page.route("**/api/boards/1", async (route) => {
     if (route.request().method() === "PUT") await route.continue();
     else await route.fallback();
   });
@@ -62,7 +62,7 @@ test("an expired session during save removes the board and its draft", async ({ 
 
 test("a failed initial board load offers retry instead of demo data", async ({ page }) => {
   let fail = true;
-  await page.route("**/api/board", async (route) => {
+  await page.route("**/api/boards/1", async (route) => {
     if (fail) await route.fulfill({ status: 503, json: { detail: "Unavailable" } });
     else await route.fallback();
   });

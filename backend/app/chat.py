@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import Field, StringConstraints, ValidationError
 from starlette.concurrency import run_in_threadpool
 
-from app.boards import CurrentUser, DatabasePath, read_board, update_board
+from app.boards import BoardId, CurrentUser, DatabasePath, read_board, resolve_board_id, update_board
 from app.database import Database
 from app.models import Board, BoardState, StrictModel, User
 from app.openrouter import OpenRouterClient, OpenRouterError
@@ -60,8 +60,11 @@ def get_ai_client() -> OpenRouterClient:
     return OpenRouterClient()
 
 
-async def answer_chat(request: ChatRequest, user: User, path: Database, ai: OpenRouterClient) -> ChatResponse:
-    snapshot = await run_in_threadpool(read_board, user, path)
+async def answer_chat(request: ChatRequest, user: User, path: Database, ai: OpenRouterClient,
+                      board_id: int | None = None) -> ChatResponse:
+    if board_id is None:
+        board_id = await run_in_threadpool(resolve_board_id, user, path)
+    snapshot = await run_in_threadpool(read_board, user, path, board_id)
     if request.revision != snapshot.revision:
         raise HTTPException(status_code=409, detail="Board changed; reload before sending your message")
     messages = [
@@ -79,10 +82,10 @@ async def answer_chat(request: ChatRequest, user: User, path: Database, ai: Open
         raise HTTPException(status_code=502, detail="AI returned an invalid board response; no changes were saved") from None
 
     if proposed.board is not None and proposed.board != snapshot.board:
-        saved = await run_in_threadpool(update_board, BoardState(revision=snapshot.revision, board=proposed.board), user, path)
+        saved = await run_in_threadpool(update_board, BoardState(revision=snapshot.revision, board=proposed.board), user, path, board_id)
         return ChatResponse(reply=proposed.reply, updated=True, state=saved)
 
-    latest = await run_in_threadpool(read_board, user, path)
+    latest = await run_in_threadpool(read_board, user, path, board_id)
     if latest.revision != snapshot.revision:
         raise HTTPException(status_code=409, detail="Board changed while AI was responding; reload and try again")
     return ChatResponse(reply=proposed.reply, updated=False, state=latest)
@@ -92,3 +95,9 @@ async def answer_chat(request: ChatRequest, user: User, path: Database, ai: Open
 async def chat(request: ChatRequest, user: CurrentUser, path: DatabasePath,
                ai: Annotated[OpenRouterClient, Depends(get_ai_client)]) -> ChatResponse:
     return await answer_chat(request, user, path, ai)
+
+
+@router.post("/boards/{board_id}/chat", response_model=ChatResponse)
+async def selected_board_chat(board_id: BoardId, request: ChatRequest, user: CurrentUser, path: DatabasePath,
+                              ai: Annotated[OpenRouterClient, Depends(get_ai_client)]) -> ChatResponse:
+    return await answer_chat(request, user, path, ai, board_id)

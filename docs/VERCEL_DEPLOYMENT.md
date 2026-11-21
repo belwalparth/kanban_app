@@ -40,7 +40,7 @@ Before the first deployment, set the direct preview migration URL securely in th
 uv run --locked python -m app.manage_db migrate
 ```
 
-This applies schema versions 1 and 2 transactionally without demo seeding. For later releases, back up the destination before migrating. The build hook never runs migrations; do not add them to ordinary preview builds or function startup.
+The current source applies schema versions 1, 2, and 3 transactionally without demo seeding. Version 3 enables multiple named boards; the deployed Part 15 release still uses versions 1 and 2. Back up and rehearse migration 3 before deploying the new backend. Older application releases reject schema 3; see [database operations](DATABASE_OPERATIONS.md) for compatibility. The build hook never runs migrations; do not add them to ordinary preview builds or function startup.
 
 `backend/build_frontend.py` installs locked frontend dependencies, including build-time dev tools, builds the static export, and replaces only the generated `backend/app/static/` directory. It removes application credentials from the frontend subprocess environment. Vercel installs backend Python dependencies from `pyproject.toml`/`uv.lock`; `UV_NO_DEV=1` excludes the Python test group. `tool.vercel.entrypoint` resolves to `app.main:app`.
 
@@ -81,6 +81,6 @@ These hosted checks require a real configured preview; passing local tests is no
 
 ## Rollback
 
-Keep the prior deployment ID and a database backup/snapshot before schema changes. Reassign the preview alias to the previous compatible deployment, with the same environment database and session secret. Do not restore SQLite into Vercel or point preview at production. Versions 1-2 are additive; this release makes no destructive schema changes. Later incompatible changes require a planned restore/forward fix with traffic stopped. Keep both the app release and schema compatibility in the rollback record.
+Keep the prior deployment ID and a database backup/snapshot before schema changes. Reassign the preview alias to the previous compatible deployment, with the same environment database and session secret. Do not restore SQLite into Vercel or point preview at production. Versions 1-2 are additive; schema 3 removes the one-board-per-owner constraint and requires a compatible backend. An incompatible application rollback requires a planned restore or forward fix with traffic stopped. Keep both the app release and schema compatibility in the rollback record.
 
 Official guidance rechecked 2026-11-18: [FastAPI](https://vercel.com/docs/frameworks/backend/fastapi), [Python runtime](https://vercel.com/docs/functions/runtimes/python), [limits](https://vercel.com/docs/functions/limitations), [monorepo source access](https://vercel.com/docs/monorepos/monorepo-faq), and [Neon pooling](https://neon.com/docs/connect/connection-pooling).

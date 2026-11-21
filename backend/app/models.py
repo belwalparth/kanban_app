@@ -48,3 +48,16 @@ class Board(StrictModel):
 class BoardState(StrictModel):
     revision: Annotated[int, Field(ge=0)]
     board: Board
+
+
+class BoardName(StrictModel):
+    name: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=100)]
+
+
+class BoardRename(BoardName):
+    revision: Annotated[int, Field(ge=0)]
+
+
+class BoardSummary(BoardName):
+    id: int
+    revision: int

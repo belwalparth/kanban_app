@@ -4,7 +4,9 @@ A local project management MVP. Sign in with `user` / `password` to manage cards
 
 Google sign-in is available when configured; see [Google setup](docs/GOOGLE_SIGN_IN.md) and [database migrations](docs/DATABASE_OPERATIONS.md). Compose enables local demo login by default; set `ALLOW_DEMO_LOGIN=false` when using Google. Demo login is disabled in preview/production.
 
-Vercel preview setup and rollback steps are in [deployment instructions](docs/VERCEL_DEPLOYMENT.md). Cloud hosting uses PostgreSQL; local SQLite data stays in Docker.
+Use the **Board** selector to switch boards, **New board** to create an empty board, and **Rename board** to change its name. Selection stays in the URL for refresh and Back/Forward. Each board keeps its own AI draft/conversation during the signed-in session; reload or sign-out clears conversations. The multi-board build requires schema 3; see [Part 17 checks](docs/PART17_VALIDATION.md) before hosting it.
+
+Vercel setup is in [deployment instructions](docs/VERCEL_DEPLOYMENT.md); see [production verification](docs/PART15_VALIDATION.md) and [recovery steps](docs/PRODUCTION_OPERATIONS.md). Cloud hosting uses PostgreSQL; local SQLite data stays in Docker.
 
 ## Getting started
 

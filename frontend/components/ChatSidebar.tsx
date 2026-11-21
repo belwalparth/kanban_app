@@ -1,19 +1,24 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useRef, useState, type FormEvent } from "react";
-import type { ChatMessage, ChatResult } from "@/lib/chat-api";
+import type { ChatMemory, ChatMessage, ChatResult } from "@/lib/chat-api";
 
-export function ChatSidebar({ open, onClose, pending, disabled, onSend }: {
+export function ChatSidebar({ open, onClose, pending, disabled, onSend, initialMemory, onMemoryChange }: {
   open: boolean;
   onClose: () => void;
   pending: boolean;
   disabled: boolean;
   onSend: (message: string, history: ChatMessage[]) => Promise<ChatResult>;
+  initialMemory?: ChatMemory;
+  onMemoryChange?: (memory: ChatMemory) => void;
 }) {
-  const [history, setHistory] = useState<ChatMessage[]>([]);
-  const [draft, setDraft] = useState("");
-  const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
+  const [memory, setMemory] = useState<ChatMemory>(initialMemory ?? { history: [], draft: "", error: "", notice: "" });
+  const { history, draft, error, notice } = memory;
+  function updateMemory(change: Partial<ChatMemory>) {
+    const next = { ...memory, ...change };
+    setMemory(next);
+    onMemoryChange?.(next);
+  }
   const locked = useRef(false);
   const mounted = useRef(false);
   const input = useRef<HTMLTextAreaElement>(null);
@@ -40,16 +45,14 @@ export function ChatSidebar({ open, onClose, pending, disabled, onSend }: {
     const message = draft.trim();
     if (!message || pending || disabled || locked.current) return;
     locked.current = true;
-    setError("");
-    setNotice("");
+    updateMemory({ error: "", notice: "" });
     try {
       const result = await onSend(message, history.slice(-20));
       if (!mounted.current) return;
-      if (result.error !== undefined) setError(result.error);
+      if (result.error !== undefined) updateMemory({ error: result.error, notice: "" });
       else {
-        setHistory((previous) => [...previous, { role: "user", content: message } as ChatMessage, { role: "assistant", content: result.response.reply } as ChatMessage].slice(-20));
-        setDraft("");
-        setNotice(result.response.updated ? "Board updated and saved." : "Answer received. Board unchanged.");
+        updateMemory({ history: [...history, { role: "user", content: message } as ChatMessage, { role: "assistant", content: result.response.reply } as ChatMessage].slice(-20),
+          draft: "", error: "", notice: result.response.updated ? "Board updated and saved." : "Answer received. Board unchanged." });
       }
     } finally {
       locked.current = false;
@@ -72,8 +75,8 @@ export function ChatSidebar({ open, onClose, pending, disabled, onSend }: {
     <form className="chat-form" onSubmit={submit} aria-busy={pending}>
       <label htmlFor="chat-message">Message the assistant</label>
       <textarea id="chat-message" ref={input} value={draft} maxLength={4000} rows={4} disabled={pending || disabled}
-        placeholder="What would you like to change?" onChange={(event) => setDraft(event.target.value)} aria-describedby="chat-hint" />
-      <p id="chat-hint" className="chat-hint">AI changes are saved to your board. Conversation clears on reload or sign out.</p>
+        placeholder="What would you like to change?" onChange={(event) => updateMemory({ draft: event.target.value })} aria-describedby="chat-hint" />
+      <p id="chat-hint" className="chat-hint">AI changes are saved to this board. Each board has its own conversation, cleared on reload or sign out.</p>
       {error && <p className="chat-error" role="alert">{error}</p>}
       {notice && <p className="chat-notice" role="status">{notice}</p>}
       <button className="primary-button" type="submit" disabled={pending || disabled || !draft.trim()}>{pending ? "Working..." : error ? "Send again" : "Send message"}</button>

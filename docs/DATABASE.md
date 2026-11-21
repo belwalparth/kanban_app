@@ -1,6 +1,33 @@
 # Database design
 
-Status: approved by the user for Part 6 on 2026-11-16. The schema and authenticated board API are implemented, and Part 7 connects the frontend to them. See [backend validation](PART6_VALIDATION.md) and [frontend persistence validation](PART7_VALIDATION.md).
+## Multiple-board contract (Part 16)
+
+Requested 2026-11-21. This section supersedes the historical one-board-per-user constraints below. Board sharing/membership is planned separately in Parts 19-21.
+
+Schema migration 3 removes the unique constraint on `boards.user_id`, adds a nonblank board `name` of at most 100 characters (default `My board` for existing rows), and indexes `(user_id, id)`. Preserve every existing board ID, owner, JSON document, and revision. SQLite rebuilds only the boards table inside the migration transaction; PostgreSQL alters the existing table. Existing identities and OAuth attempts remain unchanged. Keep names outside board JSON; duplicate names are allowed.
+
+Each owner can create several boards. New additional boards contain the five fixed columns with their standard titles and no cards. Initial Google/demo provisioning still creates just one seeded board, transactionally serialized per user. Returning sign-ins never reset or duplicate boards. Each board has its own revision; renaming the board and replacing its contents both conditionally increment that revision.
+
+The session identifies the user; the route identifies the board. Every list/read/rename/save/chat operation filters by authenticated owner. A missing or foreign board returns the same 404. List/create/rename return only `{id, name, revision}` metadata; loading a board returns the existing `{revision, board}` document envelope. Board names are trimmed, nonblank strings, at most 100 characters; unknown request fields are rejected.
+
+| Route | Request and result |
+| --- | --- |
+| `GET /api/boards` | Return the owner's metadata list in board-ID order; no card JSON. |
+| `POST /api/boards` | `{name}`; create an empty board at revision 0; return metadata with 201. |
+| `GET /api/boards/{board_id}` | Read that owned board's document/revision. |
+| `PATCH /api/boards/{board_id}` | `{name, revision}`; conditional rename; return metadata. |
+| `PUT /api/boards/{board_id}` | Existing `{revision, board}` contract; conditional document replacement. |
+| `POST /api/boards/{board_id}/chat` | Existing `{revision, message, history}` contract; AI may read/update only this board. |
+
+IDs must be positive signed 64-bit integers. Retain 401 for missing/expired authentication, 422 for malformed payloads/IDs, and 409 for stale revisions. Keep existing Origin checks and no-store headers. AI reads the selected board before calling the provider, holds no database transaction during that call, and saves/checks the same explicit board ID afterward. A change to another board must not conflict with this one.
+
+Compatibility: legacy `/api/board` GET/PUT and `/api/chat` continue to select the owner's oldest board deterministically, preserving the Part 15 frontend until Part 17 adds the selector. They must never update all of an owner's boards. The operator import requires an explicit source and destination board ID plus a verified target Google subject; it verifies both owners, backs up the source, and requires `--replace` before modifying the selected existing destination. Other boards stay unchanged.
+
+Apply migration 3 explicitly under the schema owner before starting the new cloud backend; take and rehearse a backup first. Local SQLite auto-upgrade creates a separate backup before upgrading a version-2 database. Deploy frontend/backend together for the Part 17 UI release. Earlier code rejects schema 3 and assumes unique ownership, so rollback requires a compatible application release or a deliberately restored backup; never roll back schema by discarding extra boards. Part 16 does not migrate or deploy production.
+
+## Historical local MVP (Parts 5-7)
+
+Status: approved by the user for Part 6 on 2026-11-16. The schema and authenticated board API were implemented, and Part 7 connected the frontend to them. See [backend validation](PART6_VALIDATION.md) and [frontend persistence validation](PART7_VALIDATION.md).
 
 The sections through Approval describe the historical local MVP. Parts 12-13 implement PostgreSQL storage, additive SQLite migrations, Google identity provisioning, internal-ID sessions, and database-backed OAuth attempts. See [database operations](DATABASE_OPERATIONS.md) and [Google sign-in](GOOGLE_SIGN_IN.md). The Part 11 design below records the combined target.
 

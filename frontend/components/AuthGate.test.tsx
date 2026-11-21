@@ -7,7 +7,7 @@ import { resetBoardServer } from "@/test/board-server";
 import { BoardApiError, saveBoard } from "@/lib/board-api";
 
 vi.mock("@/lib/auth", () => ({ getAuthConfig: vi.fn(), getSession: vi.fn(), signIn: vi.fn(), signOut: vi.fn() }));
-vi.mock("@/lib/board-api", async (original) => ({ ...await original<typeof import("@/lib/board-api")>(), loadBoard: vi.fn(), saveBoard: vi.fn() }));
+vi.mock("@/lib/board-api", async (original) => ({ ...await original<typeof import("@/lib/board-api")>(), listBoards: vi.fn(), createBoard: vi.fn(), renameBoard: vi.fn(), loadBoard: vi.fn(), saveBoard: vi.fn() }));
 
 beforeEach(() => {
   vi.resetAllMocks();

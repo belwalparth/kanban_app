@@ -1,14 +1,16 @@
 "use client";
 
-import { useState, type DragEvent } from "react";
-import { CardEditor } from "@/components/CardEditor";
-import { ColumnTitle } from "@/components/ColumnTitle";
-import { ChatSidebar } from "@/components/ChatSidebar";
-import { useBoard } from "@/lib/use-board";
-import {
-  addCardToColumn, deleteCardFromColumn, editCardInColumn,
-  moveCardBetweenColumns, renameColumnTitle, type Card,
-} from "@/lib/board";
+import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
+import { BoardView } from "./BoardView";
+import { BoardApiError, createBoard, listBoards, renameBoard, type BoardSummary } from "@/lib/board-api";
+import type { ChatMemory } from "@/lib/chat-api";
+
+function requestedBoard() { return new URLSearchParams(window.location.search).get("board"); }
+function writeBoardURL(id: number, replace = false) {
+  const url = new URL(window.location.href);
+  url.searchParams.set("board", String(id));
+  window.history[replace ? "replaceState" : "pushState"](null, "", url);
+}
 
 export function KanbanBoard({ username, onSignOut, signingOut = false, onSessionExpired }: {
   username?: string;
@@ -16,126 +18,153 @@ export function KanbanBoard({ username, onSignOut, signingOut = false, onSession
   signingOut?: boolean;
   onSessionExpired?: () => void;
 }) {
-  const { state, loading, saving, chatting, blocked, error, generation, save, reload, chat } = useBoard(onSessionExpired);
-  const [draggedCard, setDraggedCard] = useState<{ cardId: string; sourceColumnId: string } | null>(null);
-  const [dropTarget, setDropTarget] = useState<string | null>(null);
-  const [editor, setEditor] = useState<{ columnId: string; card?: Card } | null>(null);
-  const [announcement, setAnnouncement] = useState("");
-  const [assistantOpen, setAssistantOpen] = useState(false);
-  const columns = state?.board.columns ?? [];
-  const busy = saving || chatting || loading || blocked || signingOut;
-  const totalCards = columns.reduce((sum, column) => sum + column.cards.length, 0);
-  const completedCards = columns.find((column) => column.id === "done")?.cards.length ?? 0;
-  const progress = totalCards ? Math.round(completedCards / totalCards * 100) : 0;
+  const [boards, setBoards] = useState<BoardSummary[]>([]);
+  const [requested, setRequested] = useState<string | null>(() => typeof window === "undefined" ? null : requestedBoard());
+  const [loading, setLoading] = useState(true);
+  const [listError, setListError] = useState("");
+  const [attempt, setAttempt] = useState(0);
+  const [refresh, setRefresh] = useState(0);
+  const [waiting, setWaiting] = useState(false);
+  const [locks, setLocks] = useState({ request: false, draft: false, form: false, management: false });
+  const lockRef = useRef(locks);
+  const queued = useRef<{ requested: string | null } | null>(null);
+  const mounted = useRef(false);
+  const [mode, setMode] = useState<"create" | "rename" | null>(null);
+  const [name, setName] = useState("");
+  const [managementError, setManagementError] = useState("");
+  const [chatMemory, setChatMemory] = useState<Record<number, ChatMemory>>({});
+  const nameInput = useRef<HTMLInputElement>(null);
+  const formTrigger = useRef<HTMLElement | null>(null);
 
-  function endDrag() {
-    setDraggedCard(null);
-    setDropTarget(null);
-  }
-
-  function handleDragStart(event: DragEvent<HTMLElement>, cardId: string, sourceColumnId: string) {
-    event.dataTransfer.setData("text/plain", cardId);
-    event.dataTransfer.effectAllowed = "move";
-    setDraggedCard({ cardId, sourceColumnId });
-  }
-
-  async function handleDrop(targetColumnId: string) {
-    if (draggedCard && !busy && draggedCard.sourceColumnId !== targetColumnId) {
-      const moved = moveCardBetweenColumns(columns, draggedCard.sourceColumnId, targetColumnId, draggedCard.cardId);
-      if (await save(moved) === "saved") setAnnouncement(`Card moved to ${columns.find((column) => column.id === targetColumnId)!.title}.`);
+  const changeLock = useCallback((kind: keyof typeof locks, value: boolean) => {
+    lockRef.current = { ...lockRef.current, [kind]: value };
+    setLocks(lockRef.current);
+    if (!Object.values(lockRef.current).some(Boolean) && queued.current) {
+      setRequested(queued.current.requested);
+      queued.current = null;
+      setWaiting(false);
     }
-    endDrag();
+  }, []);
+  const onPendingChange = useCallback((value: boolean) => changeLock("request", value), [changeLock]);
+  const onDraftChange = useCallback((value: boolean) => changeLock("draft", value), [changeLock]);
+  const onRevisionChange = useCallback((id: number, revision: number) => {
+    setBoards(previous => previous.map(board => board.id === id ? { ...board, revision } : board));
+  }, []);
+
+  useEffect(() => {
+    mounted.current = true;
+    function navigate() {
+      const requested = requestedBoard();
+      if (Object.values(lockRef.current).some(Boolean)) { queued.current = { requested }; setWaiting(true); }
+      else setRequested(requested);
+    }
+    window.addEventListener("popstate", navigate);
+    return () => { mounted.current = false; window.removeEventListener("popstate", navigate); };
+  }, []);
+  useEffect(() => {
+    let active = true;
+    listBoards().then(items => {
+      if (!active) return;
+      setBoards(items);
+      const requested = requestedBoard();
+      if (requested === null && items.length) { writeBoardURL(items[0].id, true); setRequested(String(items[0].id)); }
+      else setRequested(requested);
+      setListError("");
+    }).catch(failure => {
+      if (!active) return;
+      if (failure instanceof BoardApiError && failure.status === 401) onSessionExpired?.();
+      setListError("Couldn't load your boards. Please try again.");
+    }).finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [attempt, onSessionExpired]);
+  useEffect(() => { if (mode) nameInput.current?.focus(); else formTrigger.current?.focus(); }, [mode]);
+
+  const selected = requested === null ? boards[0] : boards.find(board => String(board.id) === requested);
+  const pickerLocked = signingOut || Object.values(locks).some(Boolean);
+  function selectBoard(id: number) {
+    if (Object.values(lockRef.current).some(Boolean)) return;
+    writeBoardURL(id);
+    setRequested(String(id));
+  }
+  function openForm(next: "create" | "rename", trigger: HTMLElement) {
+    if (Object.values(lockRef.current).some(Boolean)) return;
+    formTrigger.current = trigger;
+    setName(next === "rename" ? selected?.name ?? "" : "");
+    setManagementError("");
+    setMode(next);
+    changeLock("form", true);
+  }
+  function closeForm() { setMode(null); changeLock("form", false); }
+  function reloadList() { if (pickerLocked) return; setLoading(true); setAttempt(value => value + 1); }
+  async function submitName(event: FormEvent) {
+    event.preventDefault();
+    if (!name.trim() || name.trim().length > 100 || lockRef.current.management || lockRef.current.request || lockRef.current.draft) return;
+    changeLock("management", true);
+    setManagementError("");
+    try {
+      const result = mode === "create" ? await createBoard(name.trim())
+        : await renameBoard(selected!.id, name.trim(), selected!.revision);
+      if (!mounted.current) return;
+      setBoards(previous => mode === "create" ? [...previous, result] : previous.map(board => board.id === result.id ? result : board));
+      if (mode === "create") {
+        if (!queued.current) { writeBoardURL(result.id); setRequested(String(result.id)); }
+      }
+      else setRefresh(value => value + 1);
+      closeForm();
+    } catch (failure) {
+      if (!mounted.current) return;
+      if (failure instanceof BoardApiError && failure.status === 401) onSessionExpired?.();
+      if (failure instanceof BoardApiError && failure.status === 409) {
+        setManagementError("This board changed elsewhere. Review the latest board before renaming again.");
+        try {
+          const latest = await listBoards();
+          if (!mounted.current) return;
+          setBoards(latest);
+        } catch (listFailure) {
+          if (!mounted.current) return;
+          if (listFailure instanceof BoardApiError && listFailure.status === 401) onSessionExpired?.();
+        }
+        setRefresh(value => value + 1);
+      } else setManagementError(mode === "create" ? "Couldn't create the board. Your current board is unchanged; try again."
+        : "Couldn't rename the board. Check the name and try again.");
+    } finally { if (mounted.current) changeLock("management", false); }
   }
 
-  async function saveCard(title: string, details: string, targetColumnId: string) {
-    if (!editor) return;
-    const { card, columnId } = editor;
-    const result = await save(card
-      ? moveCardBetweenColumns(editCardInColumn(columns, columnId, card.id, { title, details }), columnId, targetColumnId, card.id)
-      : addCardToColumn(columns, targetColumnId, title, details));
-    if (result === "saved") setAnnouncement(`${title} ${card ? "updated" : "created"}.`);
-    if (result !== "failed") setEditor(null);
-  }
-
-  if (!state) return <div className="session-retry">
-    {loading ? <p role="status">Loading your board...</p> : <><p role="alert">{error}</p><button className="primary-button" onClick={reload}>Try again</button></>}
-    {onSignOut && <button className="quiet-button" onClick={onSignOut} disabled={signingOut}>Sign out</button>}
+  return <div className="workspace">
+    <header className="workspace-bar">
+      <div className="wordmark"><span className="brand-mark" aria-hidden="true"><i /><i /><i /></span>Kanban<span className="wordmark-divider" /> <span className="workspace-name">My workspace</span></div>
+      <div className="workspace-actions"><span className="workspace-badge"><span aria-hidden="true" />{username ?? "Demo workspace"}</span>
+        {onSignOut && <button type="button" className="quiet-button" onClick={onSignOut} disabled={signingOut || locks.request || locks.management}>{signingOut ? "Signing out..." : "Sign out"}</button>}
+      </div>
+    </header>
+    <div className="workspace-content"><div className="board-shell">
+      {loading || listError ? <div className="session-retry">
+        {loading ? <p role="status">Loading your boards...</p> : <><p role="alert">{listError}</p><button className="primary-button" onClick={reloadList}>Try again</button></>}
+      </div> : <>
+        <div className="board-picker">
+          <label htmlFor="board-picker">Board</label>
+          <select id="board-picker" value={selected?.id ?? ""} disabled={pickerLocked} onChange={event => selectBoard(Number(event.target.value))}>
+            {!selected && <option value="">Choose a board</option>}
+            {boards.map(board => <option key={board.id} value={board.id}>{board.name}</option>)}
+          </select>
+          <button className="quiet-button" type="button" disabled={pickerLocked} onClick={event => openForm("create", event.currentTarget)}>New board</button>
+          <button className="quiet-button" type="button" disabled={pickerLocked || !selected} onClick={event => openForm("rename", event.currentTarget)}>Rename board</button>
+          <button className="quiet-button" type="button" disabled={pickerLocked} onClick={reloadList}>Reload list</button>
+        </div>
+        {mode && <form className="board-name-form" aria-label={mode === "create" ? "Create board" : "Rename board"} onSubmit={submitName}>
+          <label htmlFor="board-name">Board name</label>
+          <input id="board-name" ref={nameInput} value={name} maxLength={100} required disabled={locks.management} onChange={event => setName(event.target.value)} onKeyDown={event => { if (event.key === "Escape" && !locks.management) { event.preventDefault(); closeForm(); } }} />
+          <button className="primary-button" disabled={locks.management || !name.trim()}>{locks.management ? "Saving..." : mode === "create" ? "Create board" : "Save board name"}</button>
+          <button type="button" className="quiet-button" disabled={locks.management} onClick={closeForm}>Cancel</button>
+          {managementError && <p role="alert">{managementError}</p>}
+        </form>}
+        {waiting && <p role="status" className="board-switch-notice">Finish the current edit or wait for it to save. Your board will switch afterward.</p>}
+        {selected ? <BoardView key={`${selected.id}:${refresh}`} boardId={selected.id} name={selected.name}
+          locked={signingOut || !!mode || locks.management} onSessionExpired={onSessionExpired}
+          onPendingChange={onPendingChange} onDraftChange={onDraftChange} onRevisionChange={onRevisionChange}
+          chatMemory={chatMemory[selected.id]} onChatMemoryChange={memory => setChatMemory(previous => ({ ...previous, [selected.id]: memory }))} />
+          : <div className="session-retry"><p role="alert">{boards.length ? "This board is unavailable. Choose another board or reload the list." : "You have no boards. Create a board to get started."}</p></div>}
+      </>}
+    </div></div>
   </div>;
-
-  return (
-    <div className="workspace">
-      <header className="workspace-bar">
-        <div className="wordmark"><span className="brand-mark" aria-hidden="true"><i /><i /><i /></span>Kanban<span className="wordmark-divider" /> <span className="workspace-name">My workspace</span></div>
-        <div className="workspace-actions"><span className="workspace-badge"><span aria-hidden="true" />{username ?? "Demo workspace"}</span>
-          {onSignOut && <button type="button" className="quiet-button" onClick={onSignOut} disabled={signingOut || saving || chatting}>{signingOut ? "Signing out..." : "Sign out"}</button>}
-        </div>
-      </header>
-
-      <div className="workspace-content">
-      <div className="board-shell">
-        {error && !editor && <div className="board-error"><p role="alert">{error}</p><button className="quiet-button" onClick={reload} disabled={saving || chatting || loading}>Reload board</button></div>}
-        <div className="breadcrumb"><span>Workspace</span><span aria-hidden="true">/</span><span>Project board</span></div>
-        <header className="board-header">
-          <div className="board-header-copy">
-            <p className="eyebrow">Small steps. Meaningful progress.</p>
-            <h1>Project board<span className="heading-dot">.</span></h1>
-            <p className="board-subtitle">A little structure for your next big idea.</p>
-          </div>
-          <div className="progress-summary">
-            <div className="progress-label"><span>Project progress</span><strong>{progress}%</strong></div>
-            <div role="progressbar" aria-label="Project progress" aria-valuenow={progress} aria-valuemin={0} aria-valuemax={100} className="progress-track"><span style={{ width: `${progress}%` }} /></div>
-            <p>{completedCards} of {totalCards} cards complete</p>
-          </div>
-        </header>
-
-        <div className="board-toolbar">
-          <div className="board-view"><span className="board-view-icon" aria-hidden="true"><i /><i /><i /></span>Board view<span className="total-count" aria-label={`${totalCards} cards on this board`}>{totalCards}</span></div>
-          <button type="button" className="assistant-launcher" aria-haspopup="dialog" aria-expanded={assistantOpen} aria-controls="assistant-dialog" onClick={() => setAssistantOpen(true)} disabled={!!editor}>
-            <span aria-hidden="true">+</span>{chatting ? "Assistant working..." : "Board assistant"}
-          </button>
-        </div>
-
-        <div className="board-scroll" role="region" aria-label="Kanban columns" tabIndex={0}>
-          <div className="board-grid">
-            {columns.map((column, index) => (
-              <section key={column.id} data-column={column.id} className={`column${dropTarget === column.id ? " column-drop-ready" : ""}`} aria-label={`${column.title} column`}
-                onDragOver={(event) => { event.preventDefault(); if (draggedCard) setDropTarget(column.id); }}
-                onDragLeave={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDropTarget(null); }}
-                onDrop={(event) => { event.preventDefault(); void handleDrop(column.id); }}>
-                <div className="column-header">
-                  <span className="column-dot" aria-hidden="true" />
-                  <ColumnTitle key={`${column.id}:${generation}`} title={column.title} disabled={busy}
-                    onRename={async (title) => await save(renameColumnTitle(columns, column.id, title)) === "saved"} />
-                  <span className="card-count" aria-label={`${column.cards.length} cards`}>{column.cards.length}</span>
-                </div>
-                <div className="column-rule" />
-                <div className="card-list">
-                  {column.cards.map((card) => (
-                    <article key={card.id} aria-label={card.title} className={`card${draggedCard?.cardId === card.id ? " card-dragging" : ""}`} draggable={!editor && !busy}
-                      onDragStart={(event) => handleDragStart(event, card.id, column.id)} onDragEnd={endDrag}>
-                      <div className="card-topline"><span className="card-label">TASK</span><span className="drag-handle" aria-hidden="true">⠿</span></div>
-                      <h3>{card.title}</h3>
-                      <p className="card-details">{card.details || "No details yet."}</p>
-                      <div className="card-footer">
-                        <button type="button" className="edit-button" disabled={busy} aria-label={`Edit ${card.title}`} onClick={() => setEditor({ columnId: column.id, card })}>Edit card<span aria-hidden="true"> ↗</span></button>
-                        <button type="button" className="delete-button" disabled={busy} aria-label={`Delete ${card.title}`} onClick={async () => { if (await save(deleteCardFromColumn(columns, column.id, card.id)) === "saved") setAnnouncement(`${card.title} deleted.`); }}>Delete</button>
-                      </div>
-                    </article>
-                  ))}
-                  {column.cards.length === 0 && <div className="empty-state">A little breathing room.<span>Drop a card here to keep things moving.</span></div>}
-                </div>
-                <button type="button" className="add-card-button" disabled={busy} aria-label={`Add card to ${column.title}`} onClick={() => setEditor({ columnId: column.id })}><span aria-hidden="true">+</span>Add card</button>
-                <span className="column-number" aria-hidden="true">0{index + 1}</span>
-              </section>
-            ))}
-          </div>
-        </div>
-        <footer className="board-note"><span className="note-dot" aria-hidden="true" /><p role="status">{chatting ? "AI request in progress..." : saving ? "Saving changes..." : loading ? "Loading your board..." : error ? "Some changes were not saved." : "Your board is saved."}</p></footer>
-      </div>
-      <ChatSidebar open={assistantOpen} onClose={() => setAssistantOpen(false)} pending={chatting} disabled={saving || loading || blocked || signingOut || !!editor} onSend={chat} />
-      </div>
-      <p aria-live="polite" className="sr-only">{announcement}</p>
-      {editor && <CardEditor card={editor.card} columnId={editor.columnId} columns={columns} pending={busy} error={error} onSave={saveCard} onClose={() => setEditor(null)} />}
-    </div>
-  );
 }

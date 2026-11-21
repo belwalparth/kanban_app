@@ -10,7 +10,7 @@ import { resetBoardServer, stored } from "@/test/board-server";
 
 vi.mock("@/lib/chat-api", () => ({ sendChat: vi.fn() }));
 vi.mock("@/lib/auth", () => ({ getAuthConfig: vi.fn(), getSession: vi.fn(), signIn: vi.fn(), signOut: vi.fn() }));
-vi.mock("@/lib/board-api", async (original) => ({ ...await original<typeof import("@/lib/board-api")>(), loadBoard: vi.fn(), saveBoard: vi.fn() }));
+vi.mock("@/lib/board-api", async (original) => ({ ...await original<typeof import("@/lib/board-api")>(), listBoards: vi.fn(), createBoard: vi.fn(), renameBoard: vi.fn(), loadBoard: vi.fn(), saveBoard: vi.fn() }));
 beforeEach(() => {
   vi.resetAllMocks();
   vi.mocked(getAuthConfig).mockResolvedValue({ google: false, demo: true });
@@ -33,13 +33,13 @@ it("sends trimmed messages with the current revision/history and renders text sa
   submit("  Count the cards  ");
   expect(await screen.findByText('<img src=x onerror="alert(1)">')).toBeInTheDocument();
   expect(screen.queryByRole("img")).not.toBeInTheDocument();
-  expect(sendChat).toHaveBeenCalledWith(0, "Count the cards", []);
+  expect(sendChat).toHaveBeenCalledWith(0, "Count the cards", [], 1);
   expect(screen.getByLabelText("Message the assistant")).toHaveValue("");
   submit("What next?");
   await screen.findByText("Six cards.");
   expect(sendChat).toHaveBeenLastCalledWith(0, "What next?", [
     { role: "user", content: "Count the cards" }, { role: "assistant", content: '<img src=x onerror="alert(1)">' },
-  ]);
+  ], 1);
   expect(saveBoard).not.toHaveBeenCalled();
 });
 
@@ -85,7 +85,7 @@ it.each([413, 502, 503, 504, 422])("retains a failed draft for explicit retry af
   expect(sendChat).toHaveBeenCalledTimes(1);
   fireEvent.click(screen.getByRole("button", { name: "Send again" }));
   await screen.findByText("Six cards.");
-  expect(sendChat).toHaveBeenLastCalledWith(0, "Keep this request", []);
+  expect(sendChat).toHaveBeenLastCalledWith(0, "Keep this request", [], 1);
 });
 
 it("reloads a conflict and sends a fresh revision only after explicit resubmission", async () => {
@@ -101,7 +101,7 @@ it("reloads a conflict and sends a fresh revision only after explicit resubmissi
   expect(sendChat).toHaveBeenCalledTimes(1);
   fireEvent.click(screen.getByRole("button", { name: "Send again" }));
   await waitFor(() => expect(sendChat).toHaveBeenCalledTimes(2));
-  expect(sendChat).toHaveBeenLastCalledWith(8, "Count the cards", []);
+  expect(sendChat).toHaveBeenLastCalledWith(8, "Count the cards", [], 1);
 });
 
 it("blocks writes when conflict reload fails and recovers with Reload board", async () => {

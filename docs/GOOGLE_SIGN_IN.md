@@ -24,7 +24,7 @@ For the Next.js development proxy, use `APP_BASE_URL=http://localhost:3000`, reg
 
 ## Storage and production settings
 
-Migration 2 adds `oauth_login_states`. Run the existing explicit migration command against the direct `DATABASE_MIGRATION_URL` before starting a PostgreSQL release; startup requires versions 1 and 2 and never migrates production. See [database operations](DATABASE_OPERATIONS.md). Local SQLite upgrades from version 1 create a consistent `<DATABASE_PATH>.pre-oauth.db` backup before the additive migration; board JSON/revisions are preserved.
+Migration 2 adds `oauth_login_states`; migration 3 enables multiple named boards. Run the explicit migration command against the direct `DATABASE_MIGRATION_URL` before starting the current PostgreSQL backend; startup requires versions 1, 2, and 3 and never migrates production. See [database operations](DATABASE_OPERATIONS.md) for backups and release compatibility. Local SQLite upgrades preserve board JSON/revisions and back up the prior database before migrating.
 
 Preview/production require `APP_ENV=preview` or `production`, a PostgreSQL `DATABASE_URL`, explicit HTTPS `APP_BASE_URL`, both Google client settings, a stable session secret of at least 32 characters, and disabled demo login. Hostnames, separate databases, Google registrations, and Vercel deployment remain Parts 14-15. Use separate secrets/client registrations for preview and production.
 

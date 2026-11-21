@@ -21,3 +21,11 @@ it("preserves the status for conflict/auth handling without retrying", async () 
   expect(fetchMock).toHaveBeenCalledTimes(1);
   expect(new BoardApiError(409)).toBeInstanceOf(Error);
 });
+
+it("uses the explicit selected board route without including other board data", async () => {
+  const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ reply: "Done" })));
+  vi.stubGlobal("fetch", fetchMock);
+  await sendChat(4, "Question", [], 7);
+  expect(fetchMock.mock.calls[0][0]).toBe("/api/boards/7/chat");
+  expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({ revision: 4, message: "Question", history: [] });
+});

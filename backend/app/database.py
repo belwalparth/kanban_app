@@ -14,6 +14,7 @@ from app.models import Board, User
 SEED_PATH = Path(__file__).with_name("seed.json")
 Database = Path | str
 GOOGLE_ISSUER = "https://accounts.google.com"
+SCHEMA_VERSIONS = (1, 2, 3)
 
 
 def is_postgres(target: Database) -> bool:
@@ -78,9 +79,9 @@ def migrate(target: Database) -> None:
             db.execute("SELECT pg_advisory_xact_lock(72412001)")
         db.execute("CREATE TABLE IF NOT EXISTS schema_migrations (version INTEGER PRIMARY KEY)")
         versions = [row["version"] for row in db.execute("SELECT version FROM schema_migrations").fetchall()]
-        if any(version not in (1, 2) for version in versions):
+        if any(version not in SCHEMA_VERSIONS for version in versions):
             raise RuntimeError("Unsupported database schema version")
-        for version in (1, 2):
+        for version in SCHEMA_VERSIONS:
             if version in versions:
                 continue
             engine = "postgres" if is_postgres(target) else "sqlite"
@@ -90,7 +91,7 @@ def migrate(target: Database) -> None:
                     db.execute(statement)
             db.execute("INSERT INTO schema_migrations (version) VALUES (?)", (version,))
         db.execute("SELECT id, username FROM users LIMIT 0")
-        db.execute("SELECT user_id, board_json, revision FROM boards LIMIT 0")
+        db.execute("SELECT id, user_id, name, board_json, revision FROM boards LIMIT 0")
         db.execute("SELECT issuer, subject, user_id, email, display_name FROM google_identities LIMIT 0")
         db.execute("SELECT state_hash, browser_binding_hash, nonce, code_verifier, expires_at FROM oauth_login_states LIMIT 0")
         db.commit()
@@ -99,7 +100,7 @@ def migrate(target: Database) -> None:
 def check_schema(target: Database) -> None:
     with connection(target) as db:
         versions = [row["version"] for row in db.execute("SELECT version FROM schema_migrations").fetchall()]
-        if sorted(versions) != [1, 2]:
+        if sorted(versions) != list(SCHEMA_VERSIONS):
             raise RuntimeError("Run the database migration command before starting the app")
 
 
@@ -116,10 +117,11 @@ def initialize(path: Database, *, demo: bool = True) -> None:
                     db.backup(destination)
             elif versioned:
                 versions = [row["version"] for row in db.execute("SELECT version FROM schema_migrations").fetchall()]
-                if versions == [1]:
-                    backup = Path(str(path) + ".pre-oauth.db")
+                if sorted(versions) in ([1], [1, 2]):
+                    suffix = ".pre-oauth.db" if versions == [1] else ".pre-multiple-boards.db"
+                    backup = Path(str(path) + suffix)
                     if backup.exists():
-                        raise RuntimeError("OAuth upgrade backup already exists; migrate explicitly with a new backup path")
+                        raise RuntimeError("Upgrade backup already exists; migrate explicitly with a new backup path")
                     with sqlite3.connect(backup) as destination:
                         db.backup(destination)
     migrate(path)
@@ -130,9 +132,17 @@ def initialize(path: Database, *, demo: bool = True) -> None:
         begin_write(db, path)
         db.execute("INSERT INTO users (username) VALUES (?) ON CONFLICT(username) DO NOTHING", ("user",))
         user_id = db.execute("SELECT id FROM users WHERE username = ?", ("user",)).fetchone()["id"]
-        db.execute("INSERT INTO boards (user_id, board_json) VALUES (?, ?) ON CONFLICT(user_id) DO NOTHING",
-                   (user_id, board_value(seed, path)))
+        ensure_initial_board(db, path, user_id, seed)
         db.commit()
+
+
+def ensure_initial_board(db, path: Database, user_id: int, seed: Board) -> None:
+    # Serialize returning sign-ins too, including an existing user without a board.
+    if is_postgres(path):
+        db.execute("SELECT id FROM users WHERE id = ? FOR UPDATE", (user_id,))
+    existing = db.execute("SELECT id FROM boards WHERE user_id = ? ORDER BY id LIMIT 1", (user_id,)).fetchone()
+    if existing is None:
+        db.execute("INSERT INTO boards (user_id, board_json) VALUES (?, ?)", (user_id, board_value(seed, path)))
 
 
 def get_database_path(request: Request) -> Database:
@@ -203,7 +213,6 @@ def provision_google_user(path: Database, *, issuer: str, subject: str,
             raise RuntimeError("Inconsistent Google identity ownership")
         db.execute("UPDATE google_identities SET email = ?, display_name = ? WHERE issuer = ? AND subject = ?",
                    (email, display_name, GOOGLE_ISSUER, subject))
-        db.execute("INSERT INTO boards (user_id, board_json) VALUES (?, ?) ON CONFLICT(user_id) DO NOTHING",
-                   (user_id, board_value(seed, path)))
+        ensure_initial_board(db, path, user_id, seed)
         db.commit()
     return User(id=user_id, username=username)

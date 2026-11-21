@@ -30,6 +30,13 @@ button { transition: background .15s, color .15s, box-shadow .15s; }
 .workspace-badge { display: flex; align-items: center; gap: 7px; padding: 7px 11px; border: 1px solid var(--line); border-radius: 6px; font-size: 11px; color: var(--body-text); }
 .workspace-badge > span { width: 6px; height: 6px; background: var(--gold); border-radius: 50%; }
 .board-shell { max-width: 1800px; margin: auto; padding: 30px 4% 20px; }
+.board-picker, .board-name-form { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 22px; min-width: 0; }
+.board-picker label, .board-name-form label { font-size: 12px; font-weight: 650; }
+.board-picker select, .board-name-form input { min-width: 0; width: min(260px, 100%); max-width: 100%; padding: 9px 12px; background: white; color: var(--ink); border: 1px solid var(--line); border-radius: 6px; font: inherit; font-size: 13px; }
+.board-name-form { padding: 14px; background: #f0f2f7; border-radius: 8px; }
+.board-name-form p { flex-basis: 100%; color: #8b293b; font-size: 12px; margin: 0; }
+.board-switch-notice { color: var(--body-text); font-size: 12px; line-height: 1.6; }
+.board-header-copy { min-width: 0; overflow-wrap: anywhere; }
 .breadcrumb { display: flex; gap: 13px; font-size: 11px; color: var(--muted); margin-bottom: 38px; }
 .breadcrumb > :last-child { color: var(--body-text); }
 .board-header { display: flex; align-items: center; justify-content: space-between; gap: 30px; padding-bottom: 37px; }

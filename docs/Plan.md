@@ -3,7 +3,9 @@
 ## Agreed decisions and scope
 
 - Completed local MVP: one Docker container where FastAPI serves the statically exported Next.js UI and `/api/*`; SQLite lives in a persistent Docker volume. Use `uv` for Python dependencies. Retain this local development option.
-- Next release (requested 2026-11-18): add Google sign-in and deploy the app on Vercel. Google authentication replaces the shared `user` / `password` login in production. Each Google user owns one private board, created on first sign-in; no board switching or password registration.
+- Google sign-in and Vercel release (requested 2026-11-18): Google authentication replaces the shared `user` / `password` login in production. Parts 11-15 implement and verify the original one-private-board-per-user release; password registration remains out of scope.
+- Multiple boards (requested 2026-11-21): a signed-in user can create, name, rename, and switch between their own private boards. Parts 16-18 extend the original single-board design. Preserve each user's existing board and its contents. Each board retains five fixed, renameable columns, independent saved state and revisions, and AI assistance scoped to that board. New additional boards start with empty columns. Cross-board card moves and board deletion remain out of scope.
+- Shared boards and invitations (requested 2026-11-21): Parts 19-21 let a board owner invite multiple Google users to collaborate on the same board. Boards stay private to their owner and accepted members. Use two roles: owner manages the board name, invitations, and membership; members edit cards, rename columns, and use AI on that board. Owners create email-bound invitation links and share them manually; automatic invitation email delivery, public boards, ownership transfer, and live cursor/presence features are outside the initial collaboration release.
 - Deployment target: Vercel-hosted frontend and FastAPI API with same-origin `/api/*` routing, plus managed PostgreSQL for durable production storage. Vercel function storage cannot replace the local SQLite volume. Verify current Vercel Python/runtime, routing, and execution limits before choosing the exact project configuration in Part 11.
 - Store each board as JSON inside SQLite, rather than in a JSON file.
 - Preserve the existing five column IDs. Columns can be renamed, but not added, deleted, or reordered. Support card creation, title/details editing, deletion, and cross-column movement. Moves append to the destination; no card reordering feature is required.
@@ -289,11 +291,115 @@ Local implementation and validation prepared 2026-11-18. See `docs/PART14_VALIDA
 
 ## Part 15: Production release and verification
 
-- [ ] Configure the final Vercel production hostname, Google authorized callback, consent-screen publishing requirements, production database, and production environment settings.
-- [ ] Back up any data being migrated, apply verified migrations, and deploy the tested release. Keep existing local data intact unless an explicit import is performed.
-- [ ] Complete a real Google sign-in smoke test with two accounts: create/edit/move cards, rename columns, use AI, reload, sign out/in, and verify account isolation. Record any checks requiring interactive account access as pending until performed.
-- [ ] Verify saved boards survive a new deployment and concurrent manual/AI edits still return conflicts without lost writes.
-- [ ] Verify production error logging excludes secrets and tokens; document database backup/restore and app rollback steps, including schema compatibility.
-- [ ] Record deployed URL, actual check results, deployment/runtime limits, and remaining limitations in `docs/PART15_VALIDATION.md`.
+Production smoke verification completed 2026-11-21: migrated the selected Neon database and verified its schema; deployed Part 14 commit `7ef079b` to the existing `belwalparth/kanban-app` production project. Corrected Production `APP_BASE_URL` and Google callback settings. Public smoke checks passed before and after a production redeployment. The user exercised Google sign-in, saved manual/AI changes, two-account isolation, sessions/boards surviving redeployment, persistent deletion, and concurrent-edit conflicts. Authenticated results are user-reported; the agent did not collect credentials or independently compare private-board snapshots. See `docs/PART15_VALIDATION.md` for evidence and operational limitations, and `docs/PRODUCTION_OPERATIONS.md` for recovery. Backup rehearsal, independent runtime-role/consent-setting inspection, and separate preview resource setup/acceptance remain follow-ups.
+
+- [x] Configure and verify the final Vercel production hostname, Google authorized callback, production database schema, and required runtime environment settings. Two real accounts can sign in; Google consent-screen audience/publishing settings have not been independently inspected.
+- [x] Apply verified migrations and deploy the tested release without importing or modifying the local SQLite boards. No new schema migration or data import was needed for this verification redeploy; Neon backup/history configuration and a restore rehearsal remain documented operational follow-ups.
+- [x] Complete real Google sign-in smoke tests with two accounts: create/edit/move cards, rename columns, use AI, reload, sign out/in, and verify account isolation. The user performed and confirmed these checks in a normal browser because Google rejected the automation browser.
+- [x] Verify saved boards and existing sessions survive a production redeployment. User confirmed both accounts retained their saved state and sessions.
+- [x] Verify persistent card deletion and hosted concurrent manual edits return conflicts without lost writes. User observed the expected stale-edit message, confirmed the winning card remained, and confirmed deletion persisted after refresh.
+- [x] Exercise a manual save overlapping an in-flight AI response in production. User reported `conflict shown` in the overlapping-edit checklist; prior local tests cover winning-update preservation. No independent authenticated board snapshot comparison was performed in production.
+- [x] Review bounded production runtime/request logs for credential/token exposure and document database backup/restore and app rollback steps, including schema compatibility. Samples showed no errors or obvious credential/OAuth query exposure; full platform redaction and backup rehearsal remain unverified.
+- [x] Record deployed URL, actual check results, deployment/runtime limits, and remaining limitations in `docs/PART15_VALIDATION.md`.
 
 Success: the production Vercel app supports Google sign-in and private persistent boards with working chat; deployment and data recovery procedures are documented and verified where access permits.
+
+## Part 16: Multiple-board storage and API
+
+- [x] Update `docs/DATABASE.md` and the API contract for multiple named boards per owner before implementation. Retain whole-board JSON and give each board its own revision.
+- [x] Add a versioned migration for SQLite and PostgreSQL that removes the one-board-per-user constraint and adds board names. Preserve existing board IDs, card/column IDs, JSON, revisions, Google identities, and ownership; give existing boards a default name.
+- [x] Keep first-sign-in provisioning idempotent: a new user receives one initial board; repeated or concurrent sign-ins never create duplicate initial boards or reset existing boards.
+- [x] Add authenticated list, create, rename, read, and update operations with explicit board IDs. Validate board names and resolve ownership from the session on every operation, including AI requests; never accept an owner ID from the browser.
+- [x] Create additional boards with the existing five column IDs and no cards. Return enough board metadata for the selector without loading every board's card JSON.
+- [x] Adapt the operator-only demo import to require an explicit destination board owned by the selected verified identity, retaining backup and overwrite safeguards.
+- [x] Document compatibility and release order: deploy matching frontend/backend together and do not roll back to code that assumes a single board once users have created additional boards.
+
+Tests:
+
+- [x] Migrate populated SQLite and disposable PostgreSQL databases; verify original contents and revisions are unchanged and repeated migrations preserve data.
+- [x] Verify one user can create and independently edit several boards, with revision conflicts confined to the affected board.
+- [x] Verify missing authentication, invalid names, and unknown/foreign board IDs cannot read or mutate another user's data, including through chat and import operations.
+- [x] Verify repeated/concurrent first sign-ins create exactly one initial board and subsequent sign-ins preserve all boards.
+
+Success: both storage engines support multiple private boards per user without losing existing data or weakening ownership and revision checks.
+
+Completed locally 2026-11-21. Schema migration 3, metadata/board/AI endpoints, legacy initial-board compatibility, and explicitly targeted imports are implemented. Final backend suite: 276 passed, 3 expected skips across SQLite and isolated PostgreSQL; runtime image build and actual HTTP checks passed. The running local database and production remain on the prior release. See `docs/PART16_VALIDATION.md`; board-selector UI and hosted release remain Parts 17-18.
+
+## Part 17: Board switching and board-scoped AI
+
+- [x] Add a compact board selector with create and rename actions. Keep the AI assistant as an on-demand popup and preserve the five-column desktop layout.
+- [x] Load only the selected board. Preserve the selected board in the URL so refresh/back/forward navigation restores it; validate access on the server and recover clearly when a board is unavailable.
+- [x] On initial sign-in without a selected board, open the user's initial board. Creating a board selects it after successful creation, unless a later history navigation is queued; failed creation or rename retains the current board and shows a useful error.
+- [x] Wait for pending saves or AI operations before switching boards, and prevent stale responses from replacing another board's state. Keep loading, save errors, and conflicts associated with the correct board.
+- [x] Keep AI drafts/history separate for each board during the signed-in session, send only the selected board's context, and apply AI changes only to the explicitly requested board. Clear all private board/chat state on logout or session expiration.
+- [x] Keep board creation and renaming as explicit UI actions; AI continues to manage cards within the selected board.
+
+Tests:
+
+- [x] Component and browser checks cover create, rename, switching, refresh/navigation restoration, failed requests, unavailable boards, and session expiration.
+- [x] Create distinct cards and column names on two boards; switch repeatedly and confirm state and chat history remain isolated.
+- [x] Exercise slow saves/AI responses and revision conflicts while attempting a board switch; verify no response updates the wrong board.
+- [x] Verify keyboard/mobile board selection, popup focus behavior, and all five desktop columns remain usable.
+
+Success: users can manage and switch their boards without losing changes or mixing board contents and AI context.
+
+Completed locally 2026-11-21. Frontend tests: 78 passed; lint, type checking, static export, and runtime build passed. Browser verification covered 59 passing cases and five expected skips across regression/feature runs, including real API persistence on a disposable database. A pending-create/history race was reproduced and fixed. Review preview: localhost:8002 with synthetic demo data; the original local app and production remain unchanged. Live provider requests and hosted release are Part 18. See `docs/PART17_VALIDATION.md`.
+
+## Part 18: Multiple-board deployment and acceptance
+
+- [ ] Back up the target database and rehearse migration and release compatibility against a disposable copy before applying the migration to hosted environments.
+- [ ] Deploy and verify in an isolated preview environment, then apply the reviewed migration and matching application release to production.
+- [ ] With two real Google accounts, create at least two boards each and verify card/column operations, board names, AI edits, and cross-account isolation.
+- [ ] Verify original boards survive migration and all boards persist across refresh, logout/login, function instances, and redeployment.
+- [ ] Run relevant backend/frontend suites, lint, type checks, builds, and browser checks; record actual hosted results and remaining limitations in `docs/`.
+- [ ] Update user/deployment documentation to explain board selection and the schema-compatible recovery procedure.
+
+Success: the deployed app supports multiple durable private boards per user, with verified migration safety, ownership isolation, and board-scoped AI.
+
+## Part 19: Shared-board membership and invitation API
+
+- [ ] Extend the database/API design with board memberships and invitations, keeping each board's existing owner. Add versioned SQLite/PostgreSQL migrations that preserve boards, contents, revisions, and ownership; existing boards stay private.
+- [ ] Let only the owner create, list, and revoke invitations and remove members. Invitations identify a board and intended email address, expire after seven days, and use random single-use tokens stored as hashes. Return the shareable link only when created; keep tokens out of logs and analytics.
+- [ ] Require Google sign-in to accept an invitation. Match its intended email against the currently verified Google email claim, then attach membership to the authenticated internal user ID. Never merge user identities or grant access using an unverified profile email.
+- [ ] Accept invitations transactionally, enforcing one membership per board/user. Handle repeated acceptance, duplicate invites, expired/revoked tokens, wrong accounts, and multiple invitations without duplicate memberships or revealing private board contents.
+- [ ] Include owned and joined boards in the authenticated board list. Enforce owner/member permissions consistently for listing, reading, card/column updates, board renaming, AI, and membership operations; keep operator imports owner-targeted.
+- [ ] Recheck access at the write transaction, including after an external AI call. Removing a member must block subsequent reads/writes and prevent an already-running AI response from committing changes after removal.
+- [ ] Retain per-board revision checks for concurrent edits by different users. An outdated manual or AI update must return a conflict without overwriting another user's work.
+
+Tests:
+
+- [ ] On both databases, verify migration preservation, owner permissions, multiple accepted members, duplicate/replayed acceptance, and membership uniqueness under concurrent acceptance.
+- [ ] Reject unauthenticated users, nonmembers, wrong-email/unverified-email acceptance, expired/revoked invitations, and member attempts to manage invitations or ownership.
+- [ ] Verify an invitation alone does not grant access before acceptance, and joining one board never exposes another board owned by the same user.
+- [ ] Remove a member during a pending manual/AI operation and prove the operation cannot commit afterward. Verify edits from two authorized members conflict safely.
+
+Success: several explicitly invited users can access and edit the same board, with owner-controlled membership and consistent authorization on every path.
+
+## Part 20: Invitation UI and shared-board collaboration
+
+- [ ] Add an owner-only Share action with invite-by-email, copy-link, pending-invitation revocation, member listing, and member removal. Confirm removal before applying it; preserve the existing board layout and AI popup.
+- [ ] Provide an invitation landing flow that retains the pending invitation through Google sign-in, names the board only after validating access, and requires an explicit Accept action. Show clear messages for expired, revoked, already-used, or wrong-account invitations.
+- [ ] Show joined boards in the existing selector with an owner/shared indicator. Joining a board selects that board without creating another copy or changing ownership.
+- [ ] Show editing controls according to owner/member permissions, backed by server checks. Keep AI conversation history and drafts private to each user's session and selected board; only saved board changes are shared.
+- [ ] Load other members' saved changes on refresh and when returning focus to the board if no local edit/save is pending. Preserve pending drafts and offer a clear reload/retry path on revision conflicts. Start with request-based refresh rather than WebSockets.
+- [ ] When access is removed, clear the inaccessible board and its chat state on the next access check and return to an accessible board with a clear message. Do not silently resubmit failed edits.
+
+Tests:
+
+- [ ] Browser/component checks cover owner invitation management, sign-in/acceptance, wrong-account recovery, switching owned/shared boards, and access removal.
+- [ ] Use separate user sessions to verify that accepted members see the same saved cards and columns, while their AI chat histories remain separate.
+- [ ] Exercise simultaneous manual/AI edits, focus refresh during an unsaved edit, and member removal during active use; verify no lost writes or private-state leakage.
+- [ ] Verify keyboard/mobile access to sharing controls and that the board's desktop columns and AI popup remain usable.
+
+Success: an owner can invite several users, and each accepted member can find and work on the same board with clear permissions and conflict recovery.
+
+## Part 21: Shared-board deployment and acceptance
+
+- [ ] Back up the destination, rehearse migrations, and deploy matching frontend/backend changes to an isolated preview before production. Document schema-compatible recovery and invitation expiry/revocation behavior.
+- [ ] Verify a real owner can invite at least two distinct Google users to one board, both can accept, and all three see the same persistent manual/AI changes after refresh and sign-out/in.
+- [ ] Verify a separate nonmember cannot access the shared board, members cannot manage access, and revoking an invitation/removing a member takes effect as designed.
+- [ ] Verify concurrent edits preserve the last committed board and return recoverable revision conflicts; repeat membership removal during an in-flight AI request against hosted infrastructure.
+- [ ] Verify owned/shared board lists, membership, invitation acceptance, and saved contents survive new function instances and redeployment; keep invite tokens and Google credentials out of recorded evidence.
+- [ ] Run relevant suites/build checks, document actual hosted acceptance results and refresh behavior, and update user instructions for inviting and joining.
+
+Success: the deployed app supports multiple invited collaborators per board while preserving private boards, owner control, durable shared state, and safe concurrent edits.

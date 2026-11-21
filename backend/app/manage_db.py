@@ -19,15 +19,16 @@ def backup_sqlite(source: Path, backup: Path) -> None:
             original.backup(destination)
 
 
-def import_demo(source: Path, backup: Path, target, subject: str, *, replace: bool = False) -> None:
+def import_demo(source: Path, backup: Path, target, subject: str, *, source_board_id: int,
+                board_id: int, replace: bool = False) -> None:
     if not is_postgres(target) and Path(target).resolve() in (source.resolve(), backup.resolve()):
         raise ValueError("Destination must differ from the source and backup")
     backup_sqlite(source, backup)
     with sqlite3.connect(backup) as db:
         row = db.execute("""SELECT board_json, revision FROM boards JOIN users ON users.id = boards.user_id
-                            WHERE username = 'user'""").fetchone()
+                            WHERE username = 'user' AND boards.id = ?""", (source_board_id,)).fetchone()
     if row is None:
-        raise ValueError("Source demo board does not exist")
+        raise ValueError("Source demo board does not exist or is not owned by the demo user")
     board = decode_board(row[0])
     revision = row[1]
     if type(revision) is not int or not 0 <= revision <= 2**63 - 1:
@@ -39,12 +40,13 @@ def import_demo(source: Path, backup: Path, target, subject: str, *, replace: bo
         if identity is None:
             raise ValueError("Destination must be an already verified Google identity")
         user_id = identity["user_id"]
-        existing = db.execute("SELECT revision FROM boards WHERE user_id = ?", (user_id,)).fetchone()
-        if existing and not replace:
+        existing = db.execute("SELECT id FROM boards WHERE id = ? AND user_id = ?", (board_id, user_id)).fetchone()
+        if existing is None:
+            raise ValueError("Destination board must belong to the selected Google identity")
+        if not replace:
             raise ValueError("Destination already has a board; use --replace with the app stopped")
-        db.execute("""INSERT INTO boards (user_id, board_json, revision) VALUES (?, ?, ?)
-                      ON CONFLICT(user_id) DO UPDATE SET board_json = excluded.board_json, revision = excluded.revision""",
-                   (user_id, board_value(board, target), revision))
+        db.execute("UPDATE boards SET board_json = ?, revision = ? WHERE id = ? AND user_id = ?",
+                   (board_value(board, target), revision, board_id, user_id))
         db.commit()
 
 
@@ -58,6 +60,8 @@ def main():
     transfer.add_argument("--source", required=True, type=Path)
     transfer.add_argument("--backup", required=True, type=Path)
     transfer.add_argument("--subject", required=True, help="Exact verified Google sub; never email")
+    transfer.add_argument("--source-board-id", type=int, required=True, help="Exact source board owned by the demo user")
+    transfer.add_argument("--board-id", type=int, required=True, help="Exact destination board owned by the verified identity")
     transfer.add_argument("--sqlite", type=Path, help="Optional local rehearsal destination")
     transfer.add_argument("--replace", action="store_true")
     args = parser.parse_args()
@@ -74,7 +78,8 @@ def main():
                 backup_sqlite(args.sqlite, args.backup)
             migrate(target)
         else:
-            import_demo(args.source, args.backup, target, args.subject, replace=args.replace)
+            import_demo(args.source, args.backup, target, args.subject, source_board_id=args.source_board_id,
+                        board_id=args.board_id, replace=args.replace)
     except (sqlite3.Error, psycopg.Error):
         parser.exit(1, "Database operation failed; verify connectivity, permissions, and schema (credentials omitted).\n")
     except (ValueError, RuntimeError) as error:

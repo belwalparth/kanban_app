@@ -39,7 +39,7 @@ def test_repeated_initialization_does_not_overwrite_saved_board(tmp_path):
 @pytest.mark.parametrize("sql, params", [
     ("INSERT INTO users (username) VALUES (?)", ("user",)),
     ("INSERT INTO users (username) VALUES (?)", ("   ",)),
-    ("INSERT INTO boards (user_id, board_json) SELECT id, '{}' FROM users", ()),
+    ("INSERT INTO boards (user_id, name, board_json) SELECT id, ' ', '{}' FROM users", ()),
     ("INSERT INTO boards (user_id, board_json) VALUES (?, ?)", (9999, "{}")),
     ("UPDATE boards SET board_json = ?", ("not-json",)),
     ("UPDATE boards SET revision = ?", (-1,)),

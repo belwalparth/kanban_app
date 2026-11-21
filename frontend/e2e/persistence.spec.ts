@@ -28,7 +28,7 @@ test("real API saves card creation, editing, movement, deletion, and reload/logi
     await page.getByRole("button", { name: `Delete ${title} edited`, exact: true }).click();
     await expect(page.getByRole("article", { name: `${title} edited`, exact: true })).toHaveCount(0);
     await page.reload();
-    await expect(page.getByRole("heading", { name: "Project board." })).toBeVisible();
+    await expect(page.getByRole("progressbar", { name: "Project progress" })).toBeVisible();
     await expect(page.getByRole("article", { name: `${title} edited`, exact: true })).toHaveCount(0);
   } finally {
     await page.request.post("/api/auth/login", { data: { username: "user", password: "password" } });
