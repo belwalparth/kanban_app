@@ -1,60 +1,164 @@
-# Kanban app
+# Kanban App
 
-A local project management MVP. Sign in with `user` / `password` to manage cards and columns, or ask the board assistant to create, edit, and move cards. FastAPI serves the static Next.js UI and API from one container. Board changes persist in SQLite across refresh, logout, and container restarts.
+A full-stack Kanban board for creating, editing, moving, and organizing cards across five workflow columns. The app combines a Next.js static UI with a FastAPI backend, persistent SQLite or PostgreSQL storage, Google and demo authentication, and an optional OpenRouter board assistant.
 
-Google sign-in is available when configured; see [Google setup](docs/GOOGLE_SIGN_IN.md) and [database migrations](docs/DATABASE_OPERATIONS.md). Compose enables local demo login by default; set `ALLOW_DEMO_LOGIN=false` when using Google. Demo login is disabled in preview/production.
+**Live deployment:** [https://kanban-app-seven-nu.vercel.app/](https://kanban-app-seven-nu.vercel.app/)  
+**Repository:** [https://github.com/belwalparth/kanban_app](https://github.com/belwalparth/kanban_app)
 
-Vercel preview setup and rollback steps are in [deployment instructions](docs/VERCEL_DEPLOYMENT.md). Cloud hosting uses PostgreSQL; local SQLite data stays in Docker.
+## Features
 
-## Getting started
+- Five default columns: Backlog, To Do, In Progress, Review, and Done
+- Create, edit, move, and delete cards
+- Rename columns with keyboard-friendly save and cancel behavior
+- Persistent revisioned board state
+- Google sign-in and local demo login
+- Account-isolated boards and HttpOnly, Secure session cookies
+- Board Assistant powered by OpenRouter
+- Natural-language card creation, editing, and movement
+- SQLite support for local Docker deployments
+- PostgreSQL support for preview and production deployments
+- Responsive desktop and mobile interface
+- Origin validation, no-store private API responses, request limits, and bounded AI/provider timeouts
+- Dockerized runtime, testing, and Vercel build paths
 
-Requires Docker with Compose (Docker Desktop on Windows/macOS), running Linux containers.
+## Tech Stack
 
-```powershell
-# Windows
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts/start.ps1
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts/stop.ps1
+- **Frontend:** Next.js, React, TypeScript, CSS, Vitest, Testing Library, Playwright
+- **Backend:** Python 3.14, FastAPI, Uvicorn, Pydantic
+- **AI:** OpenRouter API
+- **Databases:** SQLite for local use; PostgreSQL for cloud use
+- **Deployment:** Vercel FastAPI functions, static Next.js export, Neon/PostgreSQL
+- **Packaging:** Docker, Docker Compose, uv
+
+## Project Structure
+
+```text
+backend/
+  app/             FastAPI routes, authentication, board logic, AI integration
+  tests/           Backend, database, authentication, chat, and deployment tests
+  build_frontend.py
+  vercel.json
+frontend/
+  app/             Next.js application
+  components/      Kanban and authentication UI
+  lib/             API and state utilities
+  test/            Vitest unit/component tests
+  e2e/             Playwright browser tests
+ docs/             Setup, authentication, database, and deployment guides
 ```
 
-```sh
-# macOS / Linux
-sh scripts/start.sh
-sh scripts/stop.sh
-```
+## Deployment
 
-Open http://localhost:8000 after starting. Stop preserves the `kanban-data` volume at `/data`, containing `/data/kanban.db`. Column names save on Enter or blur; Escape cancels typing. Wait for the saved status before closing the page. [Manual checks](docs/PART7_VALIDATION.md) include persistence and revision conflicts.
+The live Vercel deployment is:
 
-The Windows commands permit the script for that process only; they do not change system execution policy.
+**https://kanban-app-seven-nu.vercel.app/**
 
-No settings are required for the board. Optionally set a long random `SESSION_SECRET` in root `.env` to retain sessions across restarts; otherwise startup generates a key. Sessions use an eight-hour HttpOnly cookie. AI connectivity uses `OPENROUTER_API_KEY` from `.env`, passed only to the backend at runtime. Default model: `nvidia/nemotron-3.5-super-vl:free`; optionally override `OPENROUTER_MODEL` with another explicit `:free` model.
+Vercel serves the Next.js static export and FastAPI API from the same origin. Cloud deployments require PostgreSQL, an explicit `APP_ENV`, a stable session secret, and Google OAuth configuration. The Vercel project should use `backend/` as its root directory and enable source files outside the root directory for the frontend build.
 
-To check live AI connectivity after starting (one free-model arithmetic request):
-
-```sh
-docker compose exec -T app python -m app.check_ai
-```
-
-Expect `2+2 = 4; structured response validated.` To check chat and a combined board update against a disposable synthetic database:
-
-```sh
-docker compose exec -T app python -m app.check_chat
-```
-
-This makes two live requests and leaves your saved board untouched. In the browser, select **Board assistant** above the columns to open the popup; close it with Escape or its close button. All five columns fit across the desktop board, with wrapping columns on smaller screens. AI changes appear immediately and are saved. Drafts/history survive closing the popup and clear on reload or sign out. Failed requests retain the draft for explicit retry; conflicts load the latest board for review. See [Part 13 checks](docs/PART13_VALIDATION.md) and [chat API](docs/PART9_VALIDATION.md).
+The deployment configuration is in [`backend/vercel.json`](backend/vercel.json) and [`backend/pyproject.toml`](backend/pyproject.toml). Complete setup and rollback instructions are documented in [`docs/VERCEL_DEPLOYMENT.md`](docs/VERCEL_DEPLOYMENT.md).
 
 ## Tests
+
+Validation documented in the repository includes:
+
+- Backend suite: **234 passed, 1 intentional skip**
+- Frontend component/helper suite: **63 passed**
+- Playwright desktop/mobile suite: **46 passed, 4 intentional skips**
+- ESLint: passed
+- TypeScript typecheck: passed
+- Next.js static production build: passed
+- Vercel build hook with Node 24 and Python 3.14: passed
+- Separate live OpenRouter answer/update smoke check: passed against disposable synthetic data
+- PostgreSQL and cloud-mode integration checks: passed against disposable storage
+- Final Docker runtime health check: passed
+- Local Google sign-in: real account consent completed and verified in the local database
+
+The backend suite is run in Docker with:
 
 ```sh
 docker build --target test -t kanban-app-test .
 docker run --rm kanban-app-test
-docker build --target frontend-test -t kanban-frontend-test .
-docker run --rm kanban-frontend-test
 ```
 
-With local Python 3.14 and `uv`: `cd backend` then `uv run --locked pytest -q`.
+Frontend unit and static checks:
 
-For frontend development with Node.js 24 or newer, keep Docker running at port 8000, then `cd frontend`, `npm ci`, `npm run dev`; open http://localhost:3000. The development server proxies `/api/*` to FastAPI. `npm run build` exports the site to `frontend/out`.
+```sh
+cd frontend
+npm ci
+npm run test:run
+npm run lint
+npm run typecheck
+npm run build
+```
 
-Browser tests require the app running at port 8000. From `frontend/`, run `npx playwright install chromium` once, then `npm run test:e2e`. To use an installed Google Chrome instead, set `$env:PLAYWRIGHT_CHANNEL = 'chrome'` in PowerShell before running the tests.
+Browser tests:
 
-Most browser checks mock board/chat responses for isolation. The real persistence check creates and cleans up only its own temporary card; it does not reset your board. The live AI browser test is opt-in and requires a disposable app at port 8001; see the final checks document.
+```sh
+cd frontend
+npx playwright install chromium
+npm run test:e2e
+```
+
+## Run Locally with Docker
+
+Docker Compose requires Docker Desktop or Docker Engine with Linux containers.
+
+```sh
+docker compose up --build --wait
+```
+
+Open <http://localhost:8000>. Stop the app while preserving data with:
+
+```sh
+docker compose down
+```
+
+Optional environment variables include `SESSION_SECRET`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `OPENROUTER_API_KEY`, `OPENROUTER_MODEL`, and `ALLOW_DEMO_LOGIN`. Demo login is enabled by default in local Compose mode.
+
+Windows users can use:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/start.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/stop.ps1
+```
+
+macOS/Linux users can use:
+
+```sh
+sh scripts/start.sh
+sh scripts/stop.sh
+```
+
+## Local Backend Development
+
+```sh
+cd backend
+uv sync --locked
+uv run --locked pytest -q
+uv run uvicorn app.main:app --host 0.0.0.0 --port 8000
+```
+
+Python 3.14 and [`uv`](https://docs.astral.sh/uv/) are required by the backend configuration.
+
+## Architecture and Security
+
+- FastAPI mounts the API at `/api` and the static frontend at `/`
+- Mutating requests validate Origin and reject oversized payloads
+- Private API responses use `Cache-Control: no-store`
+- Sessions use signed, HttpOnly cookies
+- Cloud storage uses PostgreSQL rather than instance-local files
+- Board writes are revisioned and ownership-protected
+- AI operations preserve the saved board on provider, validation, timeout, or conflict failures
+- Request and board-size limits prevent oversized writes
+
+## Documentation
+
+- [Google sign-in setup](docs/GOOGLE_SIGN_IN.md)
+- [Database operations](docs/DATABASE_OPERATIONS.md)
+- [Vercel deployment](docs/VERCEL_DEPLOYMENT.md)
+- [Part 14 validation](docs/PART14_VALIDATION.md)
+- [Implementation plan](docs/Plan.md)
+
+## License
+
+No license has been specified for this repository.
