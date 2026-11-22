@@ -35,7 +35,7 @@ def test_migration_repeatable_without_demo_seed(store):
     check_schema(store)
     assert count(store, "users") == count(store, "boards") == 0
     with connection(store) as db:
-        assert sorted(row["version"] for row in db.execute("SELECT version FROM schema_migrations").fetchall()) == [1, 2, 3]
+        assert sorted(row["version"] for row in db.execute("SELECT version FROM schema_migrations").fetchall()) == [1, 2, 3, 4]
 
 
 def test_identity_profile_and_email_are_not_ownership(store):
@@ -177,6 +177,8 @@ def test_legacy_sqlite_migration_preserves_saved_data(tmp_path):
     target = tmp_path / "legacy.db"
     initialize(target)
     with connection(target) as db:
+        db.execute("DROP TABLE board_invitations")
+        db.execute("DROP TABLE board_memberships")
         db.execute("DROP TABLE google_identities")
         db.execute("DROP TABLE schema_migrations")
         db.execute("DROP TABLE oauth_login_states")
@@ -241,6 +243,8 @@ def test_local_upgrade_backs_up_legacy_database(tmp_path):
     target = tmp_path / "legacy-local.db"
     initialize(target)
     with connection(target) as db:
+        db.execute("DROP TABLE board_invitations")
+        db.execute("DROP TABLE board_memberships")
         db.execute("DROP TABLE google_identities")
         db.execute("DROP TABLE schema_migrations")
         db.execute("DROP TABLE oauth_login_states")
@@ -279,6 +283,9 @@ def test_version_one_sqlite_upgrade_backs_up_board_and_preserves_revision(tmp_pa
     target = tmp_path / "version-one.db"
     initialize(target)
     with connection(target) as db:
+        db.execute("DROP TABLE board_invitations")
+        db.execute("DROP TABLE board_memberships")
+        db.execute("ALTER TABLE google_identities DROP COLUMN email_verified")
         db.execute("DROP TABLE oauth_login_states")
         db.execute("DELETE FROM schema_migrations WHERE version >= 2")
         db.execute("UPDATE boards SET revision = 23")
@@ -291,7 +298,7 @@ def test_version_one_sqlite_upgrade_backs_up_board_and_preserves_revision(tmp_pa
         assert db.execute("SELECT name FROM sqlite_master WHERE name = 'oauth_login_states'").fetchone() is None
     with connection(target) as db:
         assert dict(db.execute("SELECT board_json, revision FROM boards").fetchone()) == before
-        assert sorted(row["version"] for row in db.execute("SELECT version FROM schema_migrations")) == [1, 2, 3]
+        assert sorted(row["version"] for row in db.execute("SELECT version FROM schema_migrations")) == [1, 2, 3, 4]
     initialize(target, demo=False)
     with connection(target) as db:
         assert dict(db.execute("SELECT board_json, revision FROM boards").fetchone()) == before

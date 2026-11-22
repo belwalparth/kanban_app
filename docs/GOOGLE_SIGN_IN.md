@@ -1,5 +1,15 @@
 # Google sign-in (Part 13)
 
+## Sharing boards (Part 20 local implementation)
+
+The owner selects **Share board**, enters the recipient's Google email, and chooses **Create invitation**. Copy the link while it is visible and share it manually; it is not emailed automatically and cannot be retrieved later. Pending links expire after seven days and can be revoked in the same dialog. List members there, choose **Remove member**, then **Confirm removal** to end access. Members can edit cards/columns and use the assistant; the owner alone renames the board and manages sharing.
+
+Recipients open the link, sign in with the invited Google account, then explicitly choose **Accept invitation**. **Use another Google account** keeps the invitation while signing out so they can retry with the right account. Existing accounts may need a fresh sign-in to verify their email after schema 4. An unavailable/expired/revoked/consumed link needs a replacement from the owner. Accepted boards appear as **(Shared)** in the selector; no board copy is created. Closing the invitation without joining returns to the user's own boards.
+
+Saved changes load on refresh or when the window regains focus and there is no pending local edit/save. This is not live synchronization. If a save conflicts, the latest board loads and the draft remains for review, explicit retry, or cancellation. Failed column renames retain their draft: Enter retries and Escape cancels. AI conversations stay private to the user's session/board. Removing access clears that board and its chat state on the next API/focus check and opens an available board. The pending invitation token alone uses tab session storage to survive Google navigation; acceptance/dismissal clears it.
+
+These controls are implemented and tested locally; production sharing and real Google acceptance are Part 21. See [Part 20 validation](PART20_VALIDATION.md).
+
 The backend now handles Google's authorization-code flow using Authlib 1.9.9. The frontend loads sign-in options from `/api/auth/config`: Google appears when configured, and the password form appears only when local demo login is explicitly enabled. Each Google subject owns its own board; email/name are display information. Local demo data is never assigned to a Google account automatically.
 
 ## Local setup
@@ -24,7 +34,7 @@ For the Next.js development proxy, use `APP_BASE_URL=http://localhost:3000`, reg
 
 ## Storage and production settings
 
-Migration 2 adds `oauth_login_states`; migration 3 enables multiple named boards. Run the explicit migration command against the direct `DATABASE_MIGRATION_URL` before starting the current PostgreSQL backend; startup requires versions 1, 2, and 3 and never migrates production. See [database operations](DATABASE_OPERATIONS.md) for backups and release compatibility. Local SQLite upgrades preserve board JSON/revisions and back up the prior database before migrating.
+Migration 2 adds `oauth_login_states`; migration 3 enables multiple named boards; migration 4 adds memberships, invitations and verified-email claims. Run the explicit migration command against the direct `DATABASE_MIGRATION_URL` before starting the current PostgreSQL backend; source startup requires versions 1-4 and never migrates production. Production currently remains on schema 3. See [database operations](DATABASE_OPERATIONS.md) for backups and release compatibility. Local SQLite upgrades preserve board JSON/revisions and back up the prior database before migrating.
 
 Preview/production require `APP_ENV=preview` or `production`, a PostgreSQL `DATABASE_URL`, explicit HTTPS `APP_BASE_URL`, both Google client settings, a stable session secret of at least 32 characters, and disabled demo login. Hostnames, separate databases, Google registrations, and Vercel deployment remain Parts 14-15. Use separate secrets/client registrations for preview and production.
 

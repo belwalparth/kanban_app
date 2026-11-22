@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { BoardView } from "./BoardView";
+import { ShareDialog } from "./ShareDialog";
 import { BoardApiError, createBoard, listBoards, renameBoard, type BoardSummary } from "@/lib/board-api";
 import type { ChatMemory } from "@/lib/chat-api";
 
@@ -33,8 +34,30 @@ export function KanbanBoard({ username, onSignOut, signingOut = false, onSession
   const [name, setName] = useState("");
   const [managementError, setManagementError] = useState("");
   const [chatMemory, setChatMemory] = useState<Record<number, ChatMemory>>({});
+  const [sharing, setSharing] = useState(false);
+  const [accessNotice, setAccessNotice] = useState("");
   const nameInput = useRef<HTMLInputElement>(null);
   const formTrigger = useRef<HTMLElement | null>(null);
+  const recoveryVersion = useRef(0);
+  const inaccessible = useRef(new Set<number>());
+
+  const onAccessLost = useCallback((id: number) => {
+    const version = ++recoveryVersion.current;
+    inaccessible.current.add(id);
+    setSharing(false);
+    setChatMemory(previous => { const next = { ...previous }; delete next[id]; return next; });
+    setBoards(previous => previous.filter(board => board.id !== id));
+    queued.current = null;
+    lockRef.current = { request: false, draft: false, form: false, management: false };
+    setLocks(lockRef.current); setMode(null); setWaiting(false);
+    setAccessNotice("Your access to this board has ended. Choose one of your available boards.");
+    void listBoards().then(items => {
+      if (!mounted.current || recoveryVersion.current !== version) return;
+      const available = items.filter(board => board.id !== id);
+      setBoards(available);
+      if (available.length) { writeBoardURL(available[0].id, true); setRequested(String(available[0].id)); }
+    }).catch(failure => { if (mounted.current && failure instanceof BoardApiError && failure.status === 401) onSessionExpired?.(); });
+  }, [onSessionExpired]);
 
   const changeLock = useCallback((kind: keyof typeof locks, value: boolean) => {
     lockRef.current = { ...lockRef.current, [kind]: value };
@@ -66,8 +89,10 @@ export function KanbanBoard({ username, onSignOut, signingOut = false, onSession
     listBoards().then(items => {
       if (!active) return;
       setBoards(items);
+      for (const board of items) inaccessible.current.delete(board.id);
       const requested = requestedBoard();
-      if (requested === null && items.length) { writeBoardURL(items[0].id, true); setRequested(String(items[0].id)); }
+      const initial = items.find(board => board.role !== "member") ?? items[0];
+      if (requested === null && initial) { writeBoardURL(initial.id, true); setRequested(String(initial.id)); }
       else setRequested(requested);
       setListError("");
     }).catch(failure => {
@@ -83,6 +108,7 @@ export function KanbanBoard({ username, onSignOut, signingOut = false, onSession
   const pickerLocked = signingOut || Object.values(locks).some(Boolean);
   function selectBoard(id: number) {
     if (Object.values(lockRef.current).some(Boolean)) return;
+    recoveryVersion.current += 1;
     writeBoardURL(id);
     setRequested(String(id));
   }
@@ -145,12 +171,17 @@ export function KanbanBoard({ username, onSignOut, signingOut = false, onSession
           <label htmlFor="board-picker">Board</label>
           <select id="board-picker" value={selected?.id ?? ""} disabled={pickerLocked} onChange={event => selectBoard(Number(event.target.value))}>
             {!selected && <option value="">Choose a board</option>}
-            {boards.map(board => <option key={board.id} value={board.id}>{board.name}</option>)}
+            {boards.map(board => <option key={board.id} value={board.id}>{board.name}{board.role === "member" ? " (Shared)" : ""}</option>)}
           </select>
           <button className="quiet-button" type="button" disabled={pickerLocked} onClick={event => openForm("create", event.currentTarget)}>New board</button>
-          <button className="quiet-button" type="button" disabled={pickerLocked || !selected} onClick={event => openForm("rename", event.currentTarget)}>Rename board</button>
+          {selected?.role !== "member" && <button className="quiet-button" type="button" disabled={pickerLocked || !selected} onClick={event => openForm("rename", event.currentTarget)}>Rename board</button>}
+          {selected && selected.role !== "member" && <button className="quiet-button" type="button" disabled={pickerLocked} onClick={() => { setSharing(true); changeLock("form", true); }}>Share board</button>}
+          {selected && <span className="board-role">{selected.role === "member" ? "Shared with you" : "Owner"}</span>}
           <button className="quiet-button" type="button" disabled={pickerLocked} onClick={reloadList}>Reload list</button>
         </div>
+        {accessNotice && <p role="alert" className="board-switch-notice">{accessNotice}</p>}
+        {sharing && selected && <ShareDialog key={selected.id} boardId={selected.id} name={selected.name} onSessionExpired={onSessionExpired}
+          onClose={() => { setSharing(false); changeLock("form", false); }} onAccessLost={onAccessLost} />}
         {mode && <form className="board-name-form" aria-label={mode === "create" ? "Create board" : "Rename board"} onSubmit={submitName}>
           <label htmlFor="board-name">Board name</label>
           <input id="board-name" ref={nameInput} value={name} maxLength={100} required disabled={locks.management} onChange={event => setName(event.target.value)} onKeyDown={event => { if (event.key === "Escape" && !locks.management) { event.preventDefault(); closeForm(); } }} />
@@ -160,9 +191,9 @@ export function KanbanBoard({ username, onSignOut, signingOut = false, onSession
         </form>}
         {waiting && <p role="status" className="board-switch-notice">Finish the current edit or wait for it to save. Your board will switch afterward.</p>}
         {selected ? <BoardView key={`${selected.id}:${refresh}`} boardId={selected.id} name={selected.name}
-          locked={signingOut || !!mode || locks.management} onSessionExpired={onSessionExpired}
+          locked={signingOut || !!mode || locks.management || sharing} onSessionExpired={onSessionExpired} onAccessLost={onAccessLost}
           onPendingChange={onPendingChange} onDraftChange={onDraftChange} onRevisionChange={onRevisionChange}
-          chatMemory={chatMemory[selected.id]} onChatMemoryChange={memory => setChatMemory(previous => ({ ...previous, [selected.id]: memory }))} />
+          chatMemory={chatMemory[selected.id]} onChatMemoryChange={memory => setChatMemory(previous => inaccessible.current.has(selected.id) ? previous : { ...previous, [selected.id]: memory })} />
           : <div className="session-retry"><p role="alert">{boards.length ? "This board is unavailable. Choose another board or reload the list." : "You have no boards. Create a board to get started."}</p></div>}
       </>}
     </div></div>

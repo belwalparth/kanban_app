@@ -360,40 +360,44 @@ Released 2026-11-22 with acceptance still in progress. Backed up PostgreSQL 18, 
 
 ## Part 19: Shared-board membership and invitation API
 
-- [ ] Extend the database/API design with board memberships and invitations, keeping each board's existing owner. Add versioned SQLite/PostgreSQL migrations that preserve boards, contents, revisions, and ownership; existing boards stay private.
-- [ ] Let only the owner create, list, and revoke invitations and remove members. Invitations identify a board and intended email address, expire after seven days, and use random single-use tokens stored as hashes. Return the shareable link only when created; keep tokens out of logs and analytics.
-- [ ] Require Google sign-in to accept an invitation. Match its intended email against the currently verified Google email claim, then attach membership to the authenticated internal user ID. Never merge user identities or grant access using an unverified profile email.
-- [ ] Accept invitations transactionally, enforcing one membership per board/user. Handle repeated acceptance, duplicate invites, expired/revoked tokens, wrong accounts, and multiple invitations without duplicate memberships or revealing private board contents.
-- [ ] Include owned and joined boards in the authenticated board list. Enforce owner/member permissions consistently for listing, reading, card/column updates, board renaming, AI, and membership operations; keep operator imports owner-targeted.
-- [ ] Recheck access at the write transaction, including after an external AI call. Removing a member must block subsequent reads/writes and prevent an already-running AI response from committing changes after removal.
-- [ ] Retain per-board revision checks for concurrent edits by different users. An outdated manual or AI update must return a conflict without overwriting another user's work.
+- [x] Extend the database/API design with board memberships and invitations, keeping each board's existing owner. Add versioned SQLite/PostgreSQL migrations that preserve boards, contents, revisions, and ownership; existing boards stay private.
+- [x] Let only the owner create, list, and revoke invitations and remove members. Invitations identify a board and intended email address, expire after seven days, and use random single-use tokens stored as hashes. Return the shareable link only when created; keep tokens out of logs and analytics.
+- [x] Require Google sign-in to accept an invitation. Match its intended email against the currently verified Google email claim, then attach membership to the authenticated internal user ID. Never merge user identities or grant access using an unverified profile email.
+- [x] Accept invitations transactionally, enforcing one membership per board/user. Handle repeated acceptance, duplicate invites, expired/revoked tokens, wrong accounts, and multiple invitations without duplicate memberships or revealing private board contents.
+- [x] Include owned and joined boards in the authenticated board list. Enforce owner/member permissions consistently for listing, reading, card/column updates, board renaming, AI, and membership operations; keep operator imports owner-targeted.
+- [x] Recheck access at the write transaction, including after an external AI call. Removing a member must block subsequent reads/writes and prevent an already-running AI response from committing changes after removal.
+- [x] Retain per-board revision checks for concurrent edits by different users. An outdated manual or AI update must return a conflict without overwriting another user's work.
 
 Tests:
 
-- [ ] On both databases, verify migration preservation, owner permissions, multiple accepted members, duplicate/replayed acceptance, and membership uniqueness under concurrent acceptance.
-- [ ] Reject unauthenticated users, nonmembers, wrong-email/unverified-email acceptance, expired/revoked invitations, and member attempts to manage invitations or ownership.
-- [ ] Verify an invitation alone does not grant access before acceptance, and joining one board never exposes another board owned by the same user.
-- [ ] Remove a member during a pending manual/AI operation and prove the operation cannot commit afterward. Verify edits from two authorized members conflict safely.
+- [x] On both databases, verify migration preservation, owner permissions, multiple accepted members, duplicate/replayed acceptance, and membership uniqueness under concurrent acceptance.
+- [x] Reject unauthenticated users, nonmembers, wrong-email/unverified-email acceptance, expired/revoked invitations, and member attempts to manage invitations or ownership.
+- [x] Verify an invitation alone does not grant access before acceptance, and joining one board never exposes another board owned by the same user.
+- [x] Remove a member during a pending manual/AI operation and prove the operation cannot commit afterward. Verify edits from two authorized members conflict safely.
 
 Success: several explicitly invited users can access and edit the same board, with owner-controlled membership and consistent authorization on every path.
 
+Completed locally 2026-11-22. Schema 4 and the sharing API are implemented; original boards stay private. Final checks: 321 backend tests passed with three expected skips, 78 frontend tests passed, lint/type checks and container/static build passed. Tests cover both SQLite and disposable PostgreSQL, including invitation replay/concurrency, verified Google claims, removal during pending manual/AI work, and shared revision conflicts. No hosted migration or deployment was performed. UI and hosted acceptance remain Parts 20-21; Part 18's outstanding acceptance is unchanged. See `docs/PART19_VALIDATION.md` and `docs/SHARING_API.md`.
+
 ## Part 20: Invitation UI and shared-board collaboration
 
-- [ ] Add an owner-only Share action with invite-by-email, copy-link, pending-invitation revocation, member listing, and member removal. Confirm removal before applying it; preserve the existing board layout and AI popup.
-- [ ] Provide an invitation landing flow that retains the pending invitation through Google sign-in, names the board only after validating access, and requires an explicit Accept action. Show clear messages for expired, revoked, already-used, or wrong-account invitations.
-- [ ] Show joined boards in the existing selector with an owner/shared indicator. Joining a board selects that board without creating another copy or changing ownership.
-- [ ] Show editing controls according to owner/member permissions, backed by server checks. Keep AI conversation history and drafts private to each user's session and selected board; only saved board changes are shared.
-- [ ] Load other members' saved changes on refresh and when returning focus to the board if no local edit/save is pending. Preserve pending drafts and offer a clear reload/retry path on revision conflicts. Start with request-based refresh rather than WebSockets.
-- [ ] When access is removed, clear the inaccessible board and its chat state on the next access check and return to an accessible board with a clear message. Do not silently resubmit failed edits.
+- [x] Add an owner-only Share action with invite-by-email, copy-link, pending-invitation revocation, member listing, and member removal. Confirm removal before applying it; preserve the existing board layout and AI popup.
+- [x] Provide an invitation landing flow that retains the pending invitation through Google sign-in, names the board only after validating access, and requires an explicit Accept action. Show clear messages for expired, revoked, already-used, or wrong-account invitations.
+- [x] Show joined boards in the existing selector with an owner/shared indicator. Joining a board selects that board without creating another copy or changing ownership.
+- [x] Show editing controls according to owner/member permissions, backed by server checks. Keep AI conversation history and drafts private to each user's session and selected board; only saved board changes are shared.
+- [x] Load other members' saved changes on refresh and when returning focus to the board if no local edit/save is pending. Preserve pending drafts and offer a clear reload/retry path on revision conflicts. Start with request-based refresh rather than WebSockets.
+- [x] When access is removed, clear the inaccessible board and its chat state on the next access check and return to an accessible board with a clear message. Do not silently resubmit failed edits.
 
 Tests:
 
-- [ ] Browser/component checks cover owner invitation management, sign-in/acceptance, wrong-account recovery, switching owned/shared boards, and access removal.
-- [ ] Use separate user sessions to verify that accepted members see the same saved cards and columns, while their AI chat histories remain separate.
-- [ ] Exercise simultaneous manual/AI edits, focus refresh during an unsaved edit, and member removal during active use; verify no lost writes or private-state leakage.
-- [ ] Verify keyboard/mobile access to sharing controls and that the board's desktop columns and AI popup remain usable.
+- [x] Browser/component checks cover owner invitation management, sign-in/acceptance, wrong-account recovery, switching owned/shared boards, and access removal.
+- [x] Use separate user sessions to verify that accepted members see the same saved cards and columns, while their AI chat histories remain separate.
+- [x] Exercise simultaneous manual/AI edits, focus refresh during an unsaved edit, and member removal during active use; verify no lost writes or private-state leakage.
+- [x] Verify keyboard/mobile access to sharing controls and that the board's desktop columns and AI popup remain usable.
 
 Success: an owner can invite several users, and each accepted member can find and work on the same board with clear permissions and conflict recovery.
+
+Completed locally 2026-11-23. Owner sharing dialog, invitation sign-in/acceptance flow, role indicators, focus refresh, retained conflict drafts and access-removal cleanup are implemented. Checks: 88 frontend tests, 321 backend tests (three expected skips), and 62 desktop/mobile browser cases (six expected skips) passed; lint, type checking, static export and test-container build passed. Separate synthetic sessions exercised real API/SQLite invitation and collaboration operations; Google round-trip recovery and provider responses used mocks. Isolated review app: localhost:8003 with disposable data. Production is unchanged; real Google collaboration and hosted release remain Part 21. See `docs/PART20_VALIDATION.md`.
 
 ## Part 21: Shared-board deployment and acceptance
 

@@ -6,7 +6,8 @@ import type { Column } from "./board";
 import { sendChat, type ChatMessage, type ChatResult } from "./chat-api";
 
 export function useBoard(onSessionExpired: (() => void) | undefined, boardId: number,
-  onPendingChange: (pending: boolean) => void, onRevisionChange: (id: number, revision: number) => void) {
+  onPendingChange: (pending: boolean) => void, onRevisionChange: (id: number, revision: number) => void,
+  onAccessLost: (id: number) => void, canRefresh: () => boolean) {
   const [state, setState] = useState<BoardState | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -14,9 +15,30 @@ export function useBoard(onSessionExpired: (() => void) | undefined, boardId: nu
   const [blocked, setBlocked] = useState(false);
   const [error, setError] = useState("");
   const [attempt, setAttempt] = useState(0);
-  const [generation, setGeneration] = useState(0);
   const inFlight = useRef(false);
   const mounted = useRef(false);
+  const version = useRef(0);
+
+  useEffect(() => {
+    let active = true;
+    let latestFocus = 0;
+    async function focus() {
+      const focusId = ++latestFocus;
+      const startedAt = version.current;
+      try {
+        const latest = await loadBoard(boardId);
+        if (!active || focusId !== latestFocus || startedAt !== version.current || inFlight.current || !canRefresh()) return;
+        setState(previous => latest.revision >= (previous?.revision ?? -1) ? latest : previous);
+        onRevisionChange(boardId, latest.revision);
+      } catch (failure) {
+        if (!active || focusId !== latestFocus) return;
+        if (failure instanceof BoardApiError && failure.status === 401) onSessionExpired?.();
+        if (failure instanceof BoardApiError && failure.status === 404) onAccessLost(boardId);
+      }
+    }
+    window.addEventListener("focus", focus);
+    return () => { active = false; window.removeEventListener("focus", focus); };
+  }, [boardId, canRefresh, onAccessLost, onRevisionChange, onSessionExpired]);
 
   useEffect(() => {
     mounted.current = true;
@@ -25,25 +47,28 @@ export function useBoard(onSessionExpired: (() => void) | undefined, boardId: nu
   useEffect(() => {
     let active = true;
     loadBoard(boardId).then((board) => {
-      if (active) { setState(board); onRevisionChange(boardId, board.revision); setBlocked(false); setError(""); setGeneration((value) => value + 1); }
+      if (active) { setState(board); onRevisionChange(boardId, board.revision); setBlocked(false); setError(""); }
     }).catch((failure) => {
       if (!active) return;
       if (failure instanceof BoardApiError && failure.status === 401) onSessionExpired?.();
+      if (failure instanceof BoardApiError && failure.status === 404) onAccessLost(boardId);
       setError(failure instanceof BoardApiError && failure.status === 401
         ? "Your session expired. Please sign in again." : failure instanceof BoardApiError && failure.status === 404
           ? "This board is unavailable. Choose another board or reload the list." : "Couldn't load your board. Please try again.");
     }).finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, [attempt, boardId, onSessionExpired, onRevisionChange]);
+  }, [attempt, boardId, onSessionExpired, onRevisionChange, onAccessLost]);
 
   function reload() {
     if (inFlight.current) return;
+    version.current += 1;
     setLoading(true);
     setAttempt((value) => value + 1);
   }
   async function save(columns: Column[]): Promise<"saved" | "failed" | "conflict"> {
     if (!state || inFlight.current || loading || blocked) return "failed";
     inFlight.current = true;
+    version.current += 1;
     onPendingChange(true);
     setSaving(true);
     setError("");
@@ -58,6 +83,8 @@ export function useBoard(onSessionExpired: (() => void) | undefined, boardId: nu
       if (failure instanceof BoardApiError && failure.status === 401) {
         onSessionExpired?.();
         setError("Your session expired. Please sign in again.");
+      } else if (failure instanceof BoardApiError && failure.status === 404) {
+        onAccessLost(boardId);
       } else if (failure instanceof BoardApiError && failure.status === 409) {
         setBlocked(true);
         try {
@@ -65,12 +92,12 @@ export function useBoard(onSessionExpired: (() => void) | undefined, boardId: nu
           if (!mounted.current) return "failed";
           setState(latest);
           onRevisionChange(boardId, latest.revision);
-          setGeneration((value) => value + 1);
           setBlocked(false);
           setError("This board changed elsewhere. The latest version is loaded; your edit was not saved.");
         } catch (reloadFailure) {
           if (!mounted.current) return "failed";
           if (reloadFailure instanceof BoardApiError && reloadFailure.status === 401) onSessionExpired?.();
+          if (reloadFailure instanceof BoardApiError && reloadFailure.status === 404) onAccessLost(boardId);
           setError("This board changed elsewhere. Couldn't load the latest version. Reload the board before editing.");
         }
         return "conflict";
@@ -86,6 +113,7 @@ export function useBoard(onSessionExpired: (() => void) | undefined, boardId: nu
   async function chat(message: string, history: ChatMessage[]): Promise<ChatResult> {
     if (!state || inFlight.current || loading || blocked) return { error: "Wait for the board to be ready before sending." };
     inFlight.current = true;
+    version.current += 1;
     onPendingChange(true);
     setChatting(true);
     setError("");
@@ -94,7 +122,6 @@ export function useBoard(onSessionExpired: (() => void) | undefined, boardId: nu
       if (!mounted.current) return { error: "Your session has ended." };
       setState(response.state);
       onRevisionChange(boardId, response.state.revision);
-      setGeneration((value) => value + 1);
       return { response };
     } catch (failure) {
       if (!mounted.current) return { error: "Your session has ended." };
@@ -103,6 +130,7 @@ export function useBoard(onSessionExpired: (() => void) | undefined, boardId: nu
         onSessionExpired?.();
         return { error: "Your session expired. Please sign in again." };
       }
+      if (status === 404) { onAccessLost(boardId); return { error: "Your access to this board has ended." }; }
       if (status === 409) {
         setBlocked(true);
         try {
@@ -110,12 +138,12 @@ export function useBoard(onSessionExpired: (() => void) | undefined, boardId: nu
           if (!mounted.current) return { error: "Your session has ended." };
           setState(latest);
           onRevisionChange(boardId, latest.revision);
-          setGeneration((value) => value + 1);
           setBlocked(false);
           return { error: "This board changed elsewhere. The latest version is loaded. Review it before sending again." };
         } catch (reloadFailure) {
           if (!mounted.current) return { error: "Your session has ended." };
           if (reloadFailure instanceof BoardApiError && reloadFailure.status === 401) onSessionExpired?.();
+          if (reloadFailure instanceof BoardApiError && reloadFailure.status === 404) onAccessLost(boardId);
           setError("Couldn't load the latest board. Reload the board before editing or sending again.");
           return { error: "This board changed elsewhere. Reload the board before sending again." };
         }
@@ -135,5 +163,5 @@ export function useBoard(onSessionExpired: (() => void) | undefined, boardId: nu
       if (mounted.current) { setChatting(false); onPendingChange(false); }
     }
   }
-  return { state, loading, saving, chatting, blocked, error, generation, save, reload, chat };
+  return { state, loading, saving, chatting, blocked, error, save, reload, chat };
 }

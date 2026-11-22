@@ -101,6 +101,7 @@ async def callback(request: Request):
             # Only profile strings are retained; provider tokens are discarded.
             profile = {key: claims.get(claim) if isinstance(claims.get(claim), str) else None
                        for key, claim in (("email", "email"), ("display_name", "name"))}
+            profile["email_verified"] = claims.get("email_verified") is True
     except (httpx.HTTPError, AuthlibBaseError, JoseError, TimeoutError, ValueError, KeyError, TypeError):
         return login_result(request, "failed")
     try:

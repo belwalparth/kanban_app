@@ -1,5 +1,9 @@
 # Database design
 
+## Shared-board contract (Part 19)
+
+Schema 4 and the sharing API are specified in [SHARING_API.md](SHARING_API.md). This supersedes owner-only access below: accepted members can read/edit board contents and use AI, while owners alone rename boards and manage access. Ownership, existing JSON/revisions and initial-board provisioning are preserved. Metadata additionally reports `role`; no existing board is shared by migration.
+
 ## Multiple-board contract (Part 16)
 
 Requested 2026-11-21. This section supersedes the historical one-board-per-user constraints below. Board sharing/membership is planned separately in Parts 19-21.

@@ -1,7 +1,7 @@
 import type { Column } from "./board";
 
 export type BoardState = { revision: number; board: { columns: Column[] } };
-export type BoardSummary = { id: number; name: string; revision: number };
+export type BoardSummary = { id: number; name: string; revision: number; role?: "owner" | "member" };
 export class BoardApiError extends Error {
   constructor(public status: number) { super("Board request failed"); }
 }

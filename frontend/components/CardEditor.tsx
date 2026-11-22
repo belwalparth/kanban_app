@@ -11,9 +11,11 @@ type CardEditorProps = {
   onClose: () => void;
   pending?: boolean;
   error?: string;
+  saveDisabled?: boolean;
+  onReload?: () => void;
 };
 
-export function CardEditor({ card, columnId, columns, onSave, onClose, pending = false, error }: CardEditorProps) {
+export function CardEditor({ card, columnId, columns, onSave, onClose, pending = false, saveDisabled = false, onReload, error }: CardEditorProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const titleRef = useRef<HTMLInputElement>(null);
   const [title, setTitle] = useState(card?.title ?? "");
@@ -33,7 +35,7 @@ export function CardEditor({ card, columnId, columns, onSave, onClose, pending =
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (title.trim() && !pending) onSave(title.trim(), details.trim(), destination);
+    if (title.trim() && !pending && !saveDisabled) onSave(title.trim(), details.trim(), destination);
   }
 
   return (
@@ -55,9 +57,10 @@ export function CardEditor({ card, columnId, columns, onSave, onClose, pending =
           {columns.map((column) => <option key={column.id} value={column.id}>{column.title}</option>)}
         </select>
         {error && <p role="alert" className="auth-error">{error}</p>}
+        {error && onReload && <button type="button" className="quiet-button" disabled={pending} onClick={onReload}>Reload board</button>}
         <div className="dialog-actions">
           <button type="button" className="quiet-button" onClick={onClose} disabled={pending}>Cancel</button>
-          <button type="submit" className="primary-button" disabled={pending || !title.trim()}>{pending ? "Saving..." : card ? "Save changes" : "Create card"}</button>
+          <button type="submit" className="primary-button" disabled={pending || saveDisabled || !title.trim()}>{pending ? "Saving..." : card ? "Save changes" : "Create card"}</button>
         </div>
       </form>
     </dialog>

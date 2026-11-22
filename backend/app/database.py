@@ -14,7 +14,7 @@ from app.models import Board, User
 SEED_PATH = Path(__file__).with_name("seed.json")
 Database = Path | str
 GOOGLE_ISSUER = "https://accounts.google.com"
-SCHEMA_VERSIONS = (1, 2, 3)
+SCHEMA_VERSIONS = (1, 2, 3, 4)
 
 
 def is_postgres(target: Database) -> bool:
@@ -94,6 +94,8 @@ def migrate(target: Database) -> None:
         db.execute("SELECT id, user_id, name, board_json, revision FROM boards LIMIT 0")
         db.execute("SELECT issuer, subject, user_id, email, display_name FROM google_identities LIMIT 0")
         db.execute("SELECT state_hash, browser_binding_hash, nonce, code_verifier, expires_at FROM oauth_login_states LIMIT 0")
+        db.execute("SELECT board_id, user_id, joined_at FROM board_memberships LIMIT 0")
+        db.execute("SELECT id, board_id, email, token_hash, expires_at, revoked_at, accepted_by, accepted_at FROM board_invitations LIMIT 0")
         db.commit()
 
 
@@ -117,8 +119,8 @@ def initialize(path: Database, *, demo: bool = True) -> None:
                     db.backup(destination)
             elif versioned:
                 versions = [row["version"] for row in db.execute("SELECT version FROM schema_migrations").fetchall()]
-                if sorted(versions) in ([1], [1, 2]):
-                    suffix = ".pre-oauth.db" if versions == [1] else ".pre-multiple-boards.db"
+                if sorted(versions) in ([1], [1, 2], [1, 2, 3]):
+                    suffix = {1: ".pre-oauth.db", 2: ".pre-multiple-boards.db", 3: ".pre-sharing.db"}[len(versions)]
                     backup = Path(str(path) + suffix)
                     if backup.exists():
                         raise RuntimeError("Upgrade backup already exists; migrate explicitly with a new backup path")
@@ -194,7 +196,8 @@ def consume_login_attempt(path: Database, state: str, binding: str):
 
 
 def provision_google_user(path: Database, *, issuer: str, subject: str,
-                          email: str | None = None, display_name: str | None = None) -> User:
+                          email: str | None = None, display_name: str | None = None,
+                          email_verified: bool = False) -> User:
     """Call only after cryptographic OIDC validation (Part 13), never with browser claims."""
     if issuer not in (GOOGLE_ISSUER, "accounts.google.com") or not isinstance(subject, str) or not 1 <= len(subject) <= 255:
         raise ValueError("Invalid Google identity")
@@ -211,8 +214,8 @@ def provision_google_user(path: Database, *, issuer: str, subject: str,
                               (GOOGLE_ISSUER, subject)).fetchone()
         if identity["user_id"] != user_id:
             raise RuntimeError("Inconsistent Google identity ownership")
-        db.execute("UPDATE google_identities SET email = ?, display_name = ? WHERE issuer = ? AND subject = ?",
-                   (email, display_name, GOOGLE_ISSUER, subject))
+        db.execute("UPDATE google_identities SET email = ?, display_name = ?, email_verified = ? WHERE issuer = ? AND subject = ?",
+                   (email, display_name, int(email_verified is True and bool(email)), GOOGLE_ISSUER, subject))
         ensure_initial_board(db, path, user_id, seed)
         db.commit()
     return User(id=user_id, username=username)

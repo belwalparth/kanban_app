@@ -1,5 +1,7 @@
 # Database operations
 
+Part 19 introduces schema 4 locally: memberships, invitations and a Google verified-email flag. The current source requires versions 1-4; production remains on schema 3 until the Part 21 release. Back up/rehearse before applying schema 4. Grant runtime DML on the two new tables and sequence usage, and deploy matching code. Parts 16-18 code rejects schema 4; use a schema-4-compatible release for application rollback. Existing boards stay private. Existing identities default to unverified email until a fresh Google sign-in. Local startup backs up schema 3 to `<DATABASE_PATH>.pre-sharing.db` once. See [sharing contract](SHARING_API.md).
+
 Run from `backend/` with Python 3.14 and `uv`, or inside the app container using `python -m app.manage_db`. Psycopg 3.3.9 is locked with its binary wheel; current Python 3.14 support was verified against [official installation guidance](https://www.psycopg.org/psycopg3/docs/basic/install.html) and [release notes](https://www.psycopg.org/psycopg3/docs/news.html) on 2026-11-18.
 
 ## Schema setup
@@ -10,7 +12,7 @@ Use a new, empty PostgreSQL database for each preview/production environment. Su
 uv run --locked python -m app.manage_db migrate
 ```
 
-Version 1 creates users, JSONB boards, and Google identities; version 2 adds one-time OAuth attempts. Version 3 adds board names and removes the one-board-per-owner constraint, preserving existing IDs, JSON, revisions, identities, and OAuth state. The current backend requires versions 1, 2, and 3. The command applies missing migrations transactionally; repeating it preserves data. Concurrent PostgreSQL migrations serialize through an advisory lock. Failed migration statements roll back schema changes and version records. PostgreSQL startup never migrates or seeds demo records. Grant the runtime role SELECT/INSERT/UPDATE/DELETE on these tables and sequence usage; run migrations under the schema owner.
+Version 1 creates users, JSONB boards, and Google identities; version 2 adds one-time OAuth attempts. Version 3 adds board names and removes the one-board-per-owner constraint, preserving existing IDs, JSON, revisions, identities, and OAuth state. Version 4 adds sharing as described above. The command applies missing migrations transactionally; repeating it preserves data. Concurrent PostgreSQL migrations serialize through an advisory lock. Failed migration statements roll back schema changes and version records. PostgreSQL startup never migrates or seeds demo records. Grant the runtime role SELECT/INSERT/UPDATE/DELETE on these tables and sequence usage; run migrations under the schema owner.
 
 Back up and rehearse the upgrade before applying version 3 to hosted data. Stop writes, migrate explicitly, then start the matching backend. Keep frontend/backend releases coordinated. Code from Parts 12-15 rejects schema 3 and assumes one board per owner, so reverting only the application is unsafe; use a schema-compatible release or deliberately restore a backup with traffic stopped. Do not discard additional boards to satisfy the old unique constraint. Production was backed up, rehearsed, and upgraded to version 3 on 2026-11-22; see [Part 18 validation](PART18_VALIDATION.md).
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef, useState, type DragEvent } from "react";
+import { useCallback, useLayoutEffect, useRef, useState, type DragEvent } from "react";
 import { CardEditor } from "@/components/CardEditor";
 import { ColumnTitle } from "@/components/ColumnTitle";
 import { ChatSidebar } from "@/components/ChatSidebar";
@@ -11,7 +11,7 @@ import {
   moveCardBetweenColumns, renameColumnTitle, type Card,
 } from "@/lib/board";
 
-export function BoardView({ boardId, name, locked, onSessionExpired, onPendingChange, onDraftChange, onRevisionChange, chatMemory, onChatMemoryChange }: {
+export function BoardView({ boardId, name, locked, onSessionExpired, onPendingChange, onDraftChange, onRevisionChange, onAccessLost, chatMemory, onChatMemoryChange }: {
   boardId: number;
   name: string;
   locked: boolean;
@@ -19,10 +19,10 @@ export function BoardView({ boardId, name, locked, onSessionExpired, onPendingCh
   onPendingChange: (pending: boolean) => void;
   onDraftChange: (dirty: boolean) => void;
   onRevisionChange: (id: number, revision: number) => void;
+  onAccessLost: (id: number) => void;
   chatMemory?: ChatMemory;
   onChatMemoryChange: (memory: ChatMemory) => void;
 }) {
-  const { state, loading, saving, chatting, blocked, error, generation, save, reload, chat } = useBoard(onSessionExpired, boardId, onPendingChange, onRevisionChange);
   const [draggedCard, setDraggedCard] = useState<{ cardId: string; sourceColumnId: string } | null>(null);
   const [dropTarget, setDropTarget] = useState<string | null>(null);
   const [editor, setEditor] = useState<{ columnId: string; card?: Card } | null>(null);
@@ -30,6 +30,14 @@ export function BoardView({ boardId, name, locked, onSessionExpired, onPendingCh
   const [assistantOpen, setAssistantOpen] = useState(false);
   const editorOpen = useRef(false);
   const dirtyColumns = useRef(new Set<string>());
+  useLayoutEffect(() => () => {
+    editorOpen.current = false;
+    dirtyColumns.current.clear();
+    onDraftChange(false);
+    onPendingChange(false);
+  }, [onDraftChange, onPendingChange]);
+  const canRefresh = useCallback(() => !locked && !editorOpen.current && dirtyColumns.current.size === 0, [locked]);
+  const { state, loading, saving, chatting, blocked, error, save, reload, chat } = useBoard(onSessionExpired, boardId, onPendingChange, onRevisionChange, onAccessLost, canRefresh);
   const onColumnDraftChange = useCallback((id: string, dirty: boolean) => {
     if (dirty) dirtyColumns.current.add(id); else dirtyColumns.current.delete(id);
     onDraftChange(editorOpen.current || dirtyColumns.current.size > 0);
@@ -66,12 +74,14 @@ export function BoardView({ boardId, name, locked, onSessionExpired, onPendingCh
 
   async function saveCard(title: string, details: string, targetColumnId: string) {
     if (!editor) return;
-    const { card, columnId } = editor;
+    const { card } = editor;
+    const currentColumn = card ? columns.find(column => column.cards.some(current => current.id === card.id)) : undefined;
+    if (card && !currentColumn) return;
     const result = await save(card
-      ? moveCardBetweenColumns(editCardInColumn(columns, columnId, card.id, { title, details }), columnId, targetColumnId, card.id)
+      ? moveCardBetweenColumns(editCardInColumn(columns, currentColumn!.id, card.id, { title, details }), currentColumn!.id, targetColumnId, card.id)
       : addCardToColumn(columns, targetColumnId, title, details));
     if (result === "saved") setAnnouncement(`${title} ${card ? "updated" : "created"}.`);
-    if (result !== "failed") changeEditor(null);
+    if (result === "saved") changeEditor(null);
   }
 
   if (!state) return <div className="session-retry">
@@ -111,7 +121,7 @@ export function BoardView({ boardId, name, locked, onSessionExpired, onPendingCh
                 onDrop={(event) => { event.preventDefault(); void handleDrop(column.id); }}>
                 <div className="column-header">
                   <span className="column-dot" aria-hidden="true" />
-                  <ColumnTitle key={`${column.id}:${generation}`} columnId={column.id} title={column.title} disabled={busy} onEditingChange={onColumnDraftChange}
+                  <ColumnTitle key={column.id} columnId={column.id} title={column.title} disabled={busy} onEditingChange={onColumnDraftChange}
                     onRename={async (title) => await save(renameColumnTitle(columns, column.id, title)) === "saved"} />
                   <span className="card-count" aria-label={`${column.cards.length} cards`}>{column.cards.length}</span>
                 </div>
@@ -140,7 +150,10 @@ export function BoardView({ boardId, name, locked, onSessionExpired, onPendingCh
         <footer className="board-note"><span className="note-dot" aria-hidden="true" /><p role="status">{chatting ? "AI request in progress..." : saving ? "Saving changes..." : loading ? "Loading your board..." : error ? "Some changes were not saved." : "Your board is saved."}</p></footer>
       <ChatSidebar open={assistantOpen} onClose={() => setAssistantOpen(false)} pending={chatting} disabled={saving || loading || blocked || locked || !!editor} onSend={chat} initialMemory={chatMemory} onMemoryChange={onChatMemoryChange} />
       <p aria-live="polite" className="sr-only">{announcement}</p>
-      {editor && <CardEditor card={editor.card} columnId={editor.columnId} columns={columns} pending={busy} error={error} onSave={saveCard} onClose={() => changeEditor(null)} />}
+      {editor && <CardEditor card={editor.card} columnId={editor.columnId} columns={columns} pending={saving || chatting || loading || locked}
+        saveDisabled={blocked || !!editor.card && !columns.some(column => column.cards.some(card => card.id === editor.card!.id))}
+        error={editor.card && !columns.some(column => column.cards.some(card => card.id === editor.card!.id)) ? "This card was removed. Copy any text you need, then cancel this edit." : error}
+        onReload={reload} onSave={saveCard} onClose={() => changeEditor(null)} />}
     </>
   );
 }

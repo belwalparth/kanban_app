@@ -119,6 +119,23 @@ def test_code_flow_pkce_server_state_and_internal_session(google_app):
         assert db.execute("SELECT count(*) FROM users").fetchone()[0] == 1
 
 
+@pytest.mark.parametrize("verified", [True, False, None, "true", 1])
+def test_only_boolean_verified_claim_is_retained_from_signed_token(google_app, verified):
+    client, data, path, _ = google_app
+    data["claims"] = {"email_verified": verified}
+    params = start(client, data)
+    assert finish(client, params).headers["location"] == "/"
+    with connection(path) as db:
+        profile = db.execute("SELECT email, email_verified FROM google_identities").fetchone()
+        assert profile["email"] == "same@example.test"
+        assert profile["email_verified"] == int(verified is True)
+    data["claims"] = {}
+    params = start(client, data)
+    assert finish(client, params).headers["location"] == "/"
+    with connection(path) as db:
+        assert db.execute("SELECT email_verified FROM google_identities").fetchone()["email_verified"] == 0
+
+
 @pytest.mark.parametrize("claims", [
     {"iss": "https://evil.example"}, {"aud": "another-client", "azp": "test-google-client"},
     {"aud": ["test-google-client", "other-client"], "azp": "wrong"},

@@ -56,7 +56,7 @@ def version_two(store):
     scripts = Path(__file__).parents[1] / "app" / "migrations"
     with connection(store) as db:
         begin_write(db, store)
-        for table in ("oauth_login_states", "google_identities", "boards", "users", "schema_migrations"):
+        for table in ("board_invitations", "board_memberships", "oauth_login_states", "google_identities", "boards", "users", "schema_migrations"):
             db.execute(f"DROP TABLE {table}")
         db.execute("CREATE TABLE schema_migrations (version INTEGER PRIMARY KEY)")
         for version in (1, 2):
@@ -84,7 +84,7 @@ def version_two(store):
 def test_version_two_upgrade_preserves_ids_json_revision_identity_and_oauth(store, version_two):
     with connection(store) as db:
         before = [dict(row) for row in db.execute("SELECT id, user_id, board_json, revision FROM boards ORDER BY id")]
-        identities = [dict(row) for row in db.execute("SELECT * FROM google_identities ORDER BY user_id")]
+        identities = [dict(row) for row in db.execute("SELECT issuer, subject, user_id, email, display_name FROM google_identities ORDER BY user_id")]
         attempts = [dict(row) for row in db.execute("SELECT * FROM oauth_login_states")]
     with pytest.raises(RuntimeError, match="migration"):
         check_schema(store)
@@ -93,7 +93,7 @@ def test_version_two_upgrade_preserves_ids_json_revision_identity_and_oauth(stor
     check_schema(store)
     with connection(store) as db:
         assert [dict(row) for row in db.execute("SELECT id, user_id, board_json, revision FROM boards ORDER BY id")] == before
-        assert [dict(row) for row in db.execute("SELECT * FROM google_identities ORDER BY user_id")] == identities
+        assert [dict(row) for row in db.execute("SELECT issuer, subject, user_id, email, display_name FROM google_identities ORDER BY user_id")] == identities
         assert [dict(row) for row in db.execute("SELECT * FROM oauth_login_states")] == attempts
         assert db.execute("SELECT name FROM boards").fetchone()["name"] == "My board"
         assert db.execute("SELECT user_id, subject FROM google_identities").fetchone()["user_id"] == version_two[0]
@@ -145,14 +145,14 @@ def test_list_create_empty_and_legacy_routes_remain_on_initial_board(store, user
     created = client.post("/api/boards", json={"name": "  Project two  "})
     assert created.status_code == 201
     extra = created.json()
-    assert extra == {"id": extra["id"], "name": "Project two", "revision": 0}
+    assert extra == {"id": extra["id"], "name": "Project two", "revision": 0, "role": "owner"}
     state = client.get(f"/api/boards/{extra['id']}").json()
     assert tuple(column["id"] for column in state["board"]["columns"]) == COLUMN_IDS
     assert all(column["cards"] == [] for column in state["board"]["columns"])
     listed = client.get("/api/boards")
     assert listed.headers["cache-control"] == "no-store"
     assert [board["id"] for board in listed.json()] == [original_id, extra["id"]]
-    assert all(set(board) == {"id", "name", "revision"} for board in listed.json())
+    assert all(set(board) == {"id", "name", "revision", "role"} for board in listed.json())
     initial["board"]["columns"][0]["title"] = "Initial only"
     assert client.put("/api/board", json=initial).status_code == 200
     assert client.get(f"/api/boards/{extra['id']}").json() == state

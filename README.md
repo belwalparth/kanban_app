@@ -9,6 +9,8 @@ Use the **Board** selector to switch boards, **New board** to create an empty bo
 
 Vercel setup is in [deployment instructions](docs/VERCEL_DEPLOYMENT.md); see [production verification](docs/PART15_VALIDATION.md) and [recovery steps](docs/PRODUCTION_OPERATIONS.md). Cloud hosting uses PostgreSQL; local SQLite data stays in Docker.
 
+Shared-board invitations and collaboration controls are implemented locally in Parts 19-20. See [sharing instructions](docs/GOOGLE_SIGN_IN.md#sharing-boards-part-20-local-implementation) and [local validation](docs/PART20_VALIDATION.md). Hosted release is Part 21.
+
 ## Features
 
 - Five default columns: Backlog, To Do, In Progress, Review, and Done

@@ -61,3 +61,4 @@ class BoardRename(BoardName):
 class BoardSummary(BoardName):
     id: int
     revision: int
+    role: Literal["owner", "member"] = "owner"

@@ -1,6 +1,16 @@
 # Frontend instructions
 
-Read the root `Agents.md` and `docs/Plan.md` before changes. Follow the approved part of the plan. This describes the Part 17 frontend; update it as implementation changes.
+Read the root `Agents.md` and `docs/Plan.md` before changes. Follow the approved part of the plan. This describes the Part 20 frontend; update it as implementation changes.
+
+## Part 20 collaboration behavior
+
+- `components/ShareDialog.tsx` and `lib/sharing-api.ts`: owner-only sharing, single-display invitation links/copy fallback, pending revocation, member listing and explicit removal confirmation. Native modal traps focus, supports Escape, and restores focus after the launcher is enabled. API authorization is authoritative.
+- `components/InvitationLanding.tsx`: signed-in inspection before showing the board name, explicit acceptance, generic unavailable/wrong-account recovery, and account switching. `AuthGate` captures `#invite=...`, strips it from history, and retains only the pending token in tab session storage through Google navigation. Clear it on acceptance/dismissal. Never put invite tokens in request URLs, board JSON, analytics or logs.
+- Metadata reports owner/member role. Joined boards show `(Shared)` and omit rename/share actions; normal sign-in still chooses the first owned board unless a board URL or accepted invitation selects another.
+- Focus checks read the selected board without applying a response over an open card/column draft or pending request. A mutation version prevents older focus responses from overwriting newer saves. A 404 clears the inaccessible board and its chat memory, releases workspace locks and chooses an accessible board. Ignore late memory updates from inaccessible views.
+- Conflicted card/column drafts remain for explicit retry/cancel after canonical reload. Do not remount column inputs on revision changes. Missing/deleted cards cannot be recreated by stale edits; current card location is resolved by ID before explicit retry. Failed column saves require Enter or a changed draft before another attempt; blur alone must not retry.
+- `components/Sharing.test.tsx` covers sharing, invitation persistence/account recovery, role controls, focus/draft safety and removal cleanup. `e2e/sharing-real.spec.ts` uses separate synthetic sessions with real API/SQLite storage on localhost:8003; opt in with `KANBAN_SHARING_E2E=1`. `backend/tests/browser_server.py` creates disposable identities/cookies for this fixture and is excluded from the runtime image. See `docs/PART20_VALIDATION.md` for reproduction.
+- Sharing requires schema 4. Hosted release is Part 21; do not push schema-4 source to production's deployment branch before coordinating migration and release.
 
 ## Existing code
 
@@ -17,7 +27,7 @@ Read the root `Agents.md` and `docs/Plan.md` before changes. Follow the approved
 - `app/globals.css`: palette, system fonts, compact board controls, five desktop columns with responsive wrapping, modal styles, visible focus, and reduced-motion rules.
 - `components/KanbanBoard.tsx`: workspace shell with owned-board metadata, compact selector, create/rename forms, `?board=<id>` history, and per-board chat memory. Immediate lock refs prevent switches during pending mutations/open edits; browser history navigation is queued until they finish or are cancelled. The keyed `BoardView` prevents obsolete responses from replacing another board.
 - `components/BoardView.tsx`: selected-board card/drag/editor state, CRUD, column rename, progress, announcements, and AI dialog. Remounts on selection or a board-name revision refresh; canonical content comes only from the selected board API.
-- `components/CardEditor.tsx`: native modal dialog with title/details/column fields, async save feedback, and retained drafts on failure. Pending saves disable inputs and dismissal. Conflicts close the obsolete draft after attempting a canonical reload.
+- `components/CardEditor.tsx`: native modal dialog with title/details/column fields, async save feedback, and retained drafts on failure/conflict. Pending saves disable inputs and dismissal. An error offers explicit canonical reload without discarding the draft.
 - `components/ColumnTitle.tsx`: local rename draft; Enter/blur commits, Escape cancels. Reports dirty drafts to prevent accidental board switching; cleanup after canonical conflict reload clears obsolete draft locks.
 - `lib/board.ts`: `Card`/`Column` types, seeded data, ID generation, and immutable add/edit/delete/rename/move helpers.
 - `lib/board.test.ts` and `components/KanbanBoard.test.tsx`: helper and user interaction tests.
@@ -55,7 +65,7 @@ Run from `frontend/`:
 - `npm run lint`: ESLint CLI; Next.js no longer runs lint as part of its build.
 - `npm run test:e2e`: Playwright tests; requires a running app and installed Chromium/Chrome.
 
-Current validation and manual checks are in `docs/PART17_VALIDATION.md` and `docs/GOOGLE_SIGN_IN.md`; prior parts document earlier milestones. The multi-board frontend requires the Part 16 backend/schema 3; hosted deployment remains Part 18.
+Current validation and manual checks are in `docs/PART20_VALIDATION.md` and `docs/GOOGLE_SIGN_IN.md`; prior parts document earlier milestones. The collaboration frontend requires schema 4 and its matching backend; hosted release remains Part 21.
 
 ## Change conventions
 

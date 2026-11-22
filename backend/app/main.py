@@ -19,6 +19,7 @@ from app.chat import router as chat_router
 from app.database import check_schema, initialize, is_postgres
 from app.config import auth_settings
 from app.google_auth import create_google_client, router as google_router
+from app.sharing import router as sharing_router
 
 STATIC_DIR = Path(__file__).parent / "static"
 MAX_REQUEST_BYTES = 2_000_000
@@ -86,6 +87,7 @@ def create_app(
     api.include_router(google_router)
     api.include_router(board_router)
     api.include_router(chat_router)
+    api.include_router(sharing_router)
 
     @api.exception_handler(RequestValidationError)
     async def invalid_request(request: Request, error: RequestValidationError):
