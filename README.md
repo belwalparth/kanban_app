@@ -5,7 +5,7 @@ A full-stack Kanban board for creating, editing, moving, and organizing cards ac
 **Live deployment:** [https://kanban-app-seven-nu.vercel.app/](https://kanban-app-seven-nu.vercel.app/)  
 **Repository:** [https://github.com/belwalparth/kanban_app](https://github.com/belwalparth/kanban_app)
 
-Use the **Board** selector to switch boards, **New board** to create an empty board, and **Rename board** to change its name. Selection stays in the URL for refresh and Back/Forward. Each board keeps its own AI draft/conversation during the signed-in session; reload or sign-out clears conversations. The multi-board build requires schema 3; see [Part 17 checks](docs/PART17_VALIDATION.md) before hosting it.
+Use the **Board** selector to switch boards, **New board** to create an empty board, and **Rename board** to change its name. Selection stays in the URL for refresh and Back/Forward. Each board keeps its own AI draft/conversation during the signed-in session; reload or sign-out clears conversations. Production now uses schema 3; see [release checks and acceptance status](docs/PART18_VALIDATION.md).
 
 Vercel setup is in [deployment instructions](docs/VERCEL_DEPLOYMENT.md); see [production verification](docs/PART15_VALIDATION.md) and [recovery steps](docs/PRODUCTION_OPERATIONS.md). Cloud hosting uses PostgreSQL; local SQLite data stays in Docker.
 

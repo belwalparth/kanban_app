@@ -43,6 +43,8 @@ A copied signed session remains valid until expiry, user deletion, or signing-se
 
 ## Assistant popup and board layout
 
+Production supports multiple private named boards on schema 3. Use **New board** to create an empty board, **Rename board** to change its name, and the **Board** selector to switch. Selection is retained in the URL for refresh and Back/Forward. Manual saves and AI updates apply only to the selected board; finish pending work/open drafts before switching. Each board's assistant draft/history stays separate during the signed-in session and clears on reload, logout, expiry, or account change. See [Part 18 release and acceptance](PART18_VALIDATION.md).
+
 Select **Board assistant** above the columns to open the modal. Close with its button or Escape; keyboard focus returns to the launcher. Draft/history remain when the popup is closed, including during an outstanding request; they clear on reload, sign-out, expiry, or account change. AI writes retain the existing conflict and pending-request protections.
 
 The assistant occupies no board width when closed. All five columns fit in one desktop row; tablet/mobile columns wrap into two or one columns without horizontal scrolling. Normal vertical scrolling remains available for long boards. No cards or column IDs are changed by the layout.

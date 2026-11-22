@@ -347,14 +347,16 @@ Completed locally 2026-11-21. Frontend tests: 78 passed; lint, type checking, st
 
 ## Part 18: Multiple-board deployment and acceptance
 
-- [ ] Back up the target database and rehearse migration and release compatibility against a disposable copy before applying the migration to hosted environments.
-- [ ] Deploy and verify in an isolated preview environment, then apply the reviewed migration and matching application release to production.
+- [x] Back up the target database and rehearse migration and release compatibility against a disposable copy before applying the migration to hosted environments.
+- [x] Deploy and verify in an isolated preview environment, then apply the reviewed migration and matching application release to production.
 - [ ] With two real Google accounts, create at least two boards each and verify card/column operations, board names, AI edits, and cross-account isolation.
 - [ ] Verify original boards survive migration and all boards persist across refresh, logout/login, function instances, and redeployment.
-- [ ] Run relevant backend/frontend suites, lint, type checks, builds, and browser checks; record actual hosted results and remaining limitations in `docs/`.
-- [ ] Update user/deployment documentation to explain board selection and the schema-compatible recovery procedure.
+- [x] Run relevant backend/frontend suites, lint, type checks, builds, and browser checks; record actual hosted results and remaining limitations in `docs/`.
+- [x] Update user/deployment documentation to explain board selection and the schema-compatible recovery procedure.
 
 Success: the deployed app supports multiple durable private boards per user, with verified migration safety, ownership isolation, and board-scoped AI.
+
+Released 2026-11-22 with acceptance still in progress. Backed up PostgreSQL 18, restored and rehearsed schema 3, and verified preservation before/after production migration. Preview uses a separate empty database, restricted login, and independent session secret. Preview hosted checks: 38 passed including live AI; user confirmed real Google sign-in. Fresh local checks: 277 backend tests, 78 frontend tests, and 59 browser cases passed, with expected skips. Production public checks: 18 passed after promotion. Two-account production acceptance and final redeployment persistence remain pending. See `docs/PART18_VALIDATION.md`.
 
 ## Part 19: Shared-board membership and invitation API
 
