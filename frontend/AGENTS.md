@@ -10,7 +10,7 @@ Read the root `Agents.md` and `docs/Plan.md` before changes. Follow the approved
 - Focus checks read the selected board without applying a response over an open card/column draft or pending request. A mutation version prevents older focus responses from overwriting newer saves. A 404 clears the inaccessible board and its chat memory, releases workspace locks and chooses an accessible board. Ignore late memory updates from inaccessible views.
 - Conflicted card/column drafts remain for explicit retry/cancel after canonical reload. Do not remount column inputs on revision changes. Missing/deleted cards cannot be recreated by stale edits; current card location is resolved by ID before explicit retry. Failed column saves require Enter or a changed draft before another attempt; blur alone must not retry.
 - `components/Sharing.test.tsx` covers sharing, invitation persistence/account recovery, role controls, focus/draft safety and removal cleanup. `e2e/sharing-real.spec.ts` uses separate synthetic sessions with real API/SQLite storage on localhost:8003; opt in with `KANBAN_SHARING_E2E=1`. `backend/tests/browser_server.py` creates disposable identities/cookies for this fixture and is excluded from the runtime image. See `docs/PART20_VALIDATION.md` for reproduction.
-- Sharing requires schema 4. Hosted release is Part 21; do not push schema-4 source to production's deployment branch before coordinating migration and release.
+- Sharing requires schema 4, released to production in Part 21 on 2026-11-23 after migration rehearsal and hosted synthetic verification. Real three-account Google acceptance remains pending; see `docs/PART21_VALIDATION.md`. Coordinate future migrations and deployments before pushing to the deployment branch.
 
 ## Existing code
 
@@ -65,7 +65,7 @@ Run from `frontend/`:
 - `npm run lint`: ESLint CLI; Next.js no longer runs lint as part of its build.
 - `npm run test:e2e`: Playwright tests; requires a running app and installed Chromium/Chrome.
 
-Current validation and manual checks are in `docs/PART20_VALIDATION.md` and `docs/GOOGLE_SIGN_IN.md`; prior parts document earlier milestones. The collaboration frontend requires schema 4 and its matching backend; hosted release remains Part 21.
+Current validation and manual checks are in `docs/PART21_VALIDATION.md` and `docs/GOOGLE_SIGN_IN.md`; prior parts document earlier milestones. The collaboration frontend requires schema 4 and its matching backend, now deployed; real Google collaboration acceptance remains pending.
 
 ## Change conventions
 

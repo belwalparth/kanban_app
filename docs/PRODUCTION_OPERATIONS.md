@@ -10,13 +10,17 @@ Before schema changes, take a provider snapshot or a custom-format `pg_dump` bac
 
 ## Application rollback
 
+Current production is schema 4, released 2026-11-23 as `dpl_99j8if5yUUGH9st4UaMF6BhvKEaF`, source `71fb8a3d9e016abb93ffddf6de8c550f8ddfa7d8`. All schema-3 releases below are now incompatible rollback targets. Use a tested schema-4 release or a forward fix; a database restore requires a separate deliberate recovery plan. Reassigning an older app alone repeats the session outage. See [Part 21 validation](PART21_VALIDATION.md).
+
+The pre-schema-4 backups are `/private/part21-before-schema4.dump` and the fresh cutover archive `/private/part21-cutover.dump` in Docker volume `kanban-part21-private-backups`. The first archive was restored into an isolated empty database, migrated to schema 4 and checked against private record fingerprints. These backups predate sharing writes and cannot merge subsequent changes. Preserve the volume and Docker storage.
+
 Known working production deployment before the Part 15 persistence redeploy: `dpl_HefJe5wV7vE5iygSfDmNG3dgDnpC`, commit `7ef079b43651c54045158798312b3b42f0b2d6cf`, schema versions 1 and 2.
 
 Production was upgraded to schema 3 on 2026-11-22. The first verified schema-3 release is `dpl_4RrVRh8fnfard7GGMeKfwaNNJbXw`, commit `df4d9415942b0b3da375f9a79d724ce062b08940`. The Part 15 deployment IDs are incompatible rollback targets. Choose a schema-3-compatible release or follow a deliberate database restore plan; see [database operations](DATABASE_OPERATIONS.md).
 
 The pre-upgrade custom-format PostgreSQL 18 backup is `/private/before-schema3-verified.dump` in Docker volume `kanban-part18-private-backups`. Its restore was rehearsed in an isolated database, then schema 3 was applied to the copy and all original data fingerprints verified. Preserve the volume and Docker storage; deleting either destroys this local recovery artifact. The archive predates new multi-board writes and does not merge later changes. See [Part 18 validation](PART18_VALIDATION.md).
 
-1. Inspect the current project and intended prior deployment. Confirm account `belwalparth`, project `kanban-app`, compatible schema, database, `APP_BASE_URL`, and signing secret.
+1. Inspect the current project and intended prior deployment. Confirm account `belwalparth`, project `kanban-app`, schema 4 compatibility, database, `APP_BASE_URL`, and signing secret. Historical schema-3 deployments listed above are not eligible application recovery targets.
 2. In the project dashboard, choose Instant Rollback and review the eligible prior deployment. Hobby supports the immediately previous production deployment. Rollback restores that deployment's original environment values; current project settings do not repair an older deployment's configuration.
 3. After rollback, verify `/api/health`, Google sign-in, private board loading, and saved data. Rollback changes the application release, not database contents.
 4. Verify deployment auto-assignment before the next release. Use an explicit production promotion when restoring normal release routing.

@@ -5,11 +5,11 @@ A full-stack Kanban board for creating, editing, moving, and organizing cards ac
 **Live deployment:** [https://kanban-app-seven-nu.vercel.app/](https://kanban-app-seven-nu.vercel.app/)  
 **Repository:** [https://github.com/belwalparth/kanban_app](https://github.com/belwalparth/kanban_app)
 
-Use the **Board** selector to switch boards, **New board** to create an empty board, and **Rename board** to change its name. Selection stays in the URL for refresh and Back/Forward. Each board keeps its own AI draft/conversation during the signed-in session; reload or sign-out clears conversations. Production now uses schema 3; see [release checks and acceptance status](docs/PART18_VALIDATION.md).
+Use the **Board** selector to switch boards, **New board** to create an empty board, and **Rename board** to change its name. Selection stays in the URL for refresh and Back/Forward. Each board keeps its own AI draft/conversation during the signed-in session; reload or sign-out clears conversations. Production uses schema 4; see [release checks and acceptance status](docs/PART21_VALIDATION.md).
 
 Vercel setup is in [deployment instructions](docs/VERCEL_DEPLOYMENT.md); see [production verification](docs/PART15_VALIDATION.md) and [recovery steps](docs/PRODUCTION_OPERATIONS.md). Cloud hosting uses PostgreSQL; local SQLite data stays in Docker.
 
-Shared-board invitations and collaboration controls are implemented locally in Parts 19-20. See [sharing instructions](docs/GOOGLE_SIGN_IN.md#sharing-boards-part-20-local-implementation) and [local validation](docs/PART20_VALIDATION.md). Hosted release is Part 21.
+Owners can use **Share board**, beside **Rename board**, to invite Google users and copy their invitation links. Recipients sign in with the invited email and explicitly accept. Members edit cards, columns and use AI; owners manage invitations and membership. Saved changes load on refresh or returning focus when no draft/save is pending. Real three-account acceptance remains pending; see [sharing instructions](docs/GOOGLE_SIGN_IN.md#sharing-boards) and [hosted validation](docs/PART21_VALIDATION.md).
 
 ## Features
 
@@ -67,9 +67,9 @@ The deployment configuration is in [`backend/vercel.json`](backend/vercel.json) 
 
 Validation documented in the repository includes:
 
-- Backend suite: **234 passed, 1 intentional skip**
-- Frontend component/helper suite: **63 passed**
-- Playwright desktop/mobile suite: **46 passed, 4 intentional skips**
+- Backend suite: **321 passed, 3 expected skips**
+- Frontend component/helper suite: **88 passed**
+- Playwright desktop/mobile suite: **62 passed, 6 expected skips**
 - ESLint: passed
 - TypeScript typecheck: passed
 - Next.js static production build: passed

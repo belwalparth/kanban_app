@@ -11,7 +11,7 @@ Completed locally 2026-11-23. Sharing UI uses the Part 19/schema-4 API. Producti
 - Revision conflicts load canonical state but retain drafts for explicit retry/cancel. Removed cards cannot be silently recreated by stale edits. Failed column saves require a changed draft or Enter to retry; blur does not automatically repeat a failed write.
 - Access removal clears the board, editor and that board's AI memory on the next API/focus check, then opens an accessible board with a message. Late responses cannot restore inaccessible chat memory. Chat remains private per user/session/board.
 
-Usage: [Google sign-in and sharing](GOOGLE_SIGN_IN.md#sharing-boards-part-20-local-implementation). Contract: [SHARING_API.md](SHARING_API.md).
+Usage: [Google sign-in and sharing](GOOGLE_SIGN_IN.md#sharing-boards). Contract: [SHARING_API.md](SHARING_API.md).
 
 ## Results
 

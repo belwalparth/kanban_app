@@ -401,11 +401,13 @@ Completed locally 2026-11-23. Owner sharing dialog, invitation sign-in/acceptanc
 
 ## Part 21: Shared-board deployment and acceptance
 
-- [ ] Back up the destination, rehearse migrations, and deploy matching frontend/backend changes to an isolated preview before production. Document schema-compatible recovery and invitation expiry/revocation behavior.
+- [x] Back up the destination, rehearse migrations, and deploy matching frontend/backend changes to an isolated preview before production. Document schema-compatible recovery and invitation expiry/revocation behavior.
 - [ ] Verify a real owner can invite at least two distinct Google users to one board, both can accept, and all three see the same persistent manual/AI changes after refresh and sign-out/in.
-- [ ] Verify a separate nonmember cannot access the shared board, members cannot manage access, and revoking an invitation/removing a member takes effect as designed.
-- [ ] Verify concurrent edits preserve the last committed board and return recoverable revision conflicts; repeat membership removal during an in-flight AI request against hosted infrastructure.
-- [ ] Verify owned/shared board lists, membership, invitation acceptance, and saved contents survive new function instances and redeployment; keep invite tokens and Google credentials out of recorded evidence.
-- [ ] Run relevant suites/build checks, document actual hosted acceptance results and refresh behavior, and update user instructions for inviting and joining.
+- [x] Verify a separate nonmember cannot access the shared board, members cannot manage access, and revoking an invitation/removing a member takes effect as designed.
+- [x] Verify concurrent edits preserve the last committed board and return recoverable revision conflicts; repeat membership removal during an in-flight AI request against hosted infrastructure.
+- [x] Verify owned/shared board lists, membership, invitation acceptance, and saved contents survive new function instances and redeployment; keep invite tokens and Google credentials out of recorded evidence.
+- [x] Run relevant suites/build checks, document actual hosted acceptance results and refresh behavior, and update user instructions for inviting and joining.
 
 Success: the deployed app supports multiple invited collaborators per board while preserving private boards, owner control, durable shared state, and safe concurrent edits.
+
+Released 2026-11-23 with real-account acceptance pending. Backed up production, restored and rehearsed schema 4, and verified original identities and all six board fingerprints before promotion. Preview sharing, permissions, conflicts, live AI, member removal during a pending live AI request and redeployment persistence passed 93 HTTP checks using four explicitly synthetic identities. Fresh checks: 321 backend tests (three skips), 88 frontend tests, 62 browser cases (six skips), lint/type checks and hosted static builds passed. Production migration/grants and coordinated promotion completed; 30 public release checks passed. No synthetic identities or sessions were created in production. The user can arrange three Google users; their invitation/sign-in/refresh/logout acceptance and follow-up production redeployment check remain pending, alongside Part 18's real-account acceptance. See `docs/PART21_VALIDATION.md`.
